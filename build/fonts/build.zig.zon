@@ -1,0 +1,15 @@
+// SPDX-FileCopyrightText: © 2024 Mark Delk <jethrodaniel@gmail.com>
+//
+// SPDX-License-Identifier: Zlib
+
+.{
+    .name = "fonts",
+    .version = "0.0.0",
+    .paths = .{""},
+    .dependencies = .{
+        .intel_one_mono = .{
+            .url = "git+https://github.com/intel/intel-one-mono#V1.3.0",
+            .hash = "1220f1af56308368aac7a289e4d7ab23fc7688368aa3decc0d1a28e3f9f477dcb3b4",
+        },
+    },
+}
