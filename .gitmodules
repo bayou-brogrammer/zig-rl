@@ -1,0 +1,3 @@
+[submodule "build/sdl"]
+	path = build/sdl
+	url = https://github.com/bayou-brogrammer/SDL.zig
