@@ -1,0 +1,4 @@
+reload_config_period: 500
+
+# throttle to frame rate
+frame_rate: 30
