@@ -1,0 +1,314 @@
+# reload map file 
+
+reload_config_period: 500
+
+tile_noise_scaler: 4.0
+# alpha for player move highlight
+highlight_player_move: 226
+# alpha for player attack highlight
+highlight_alpha_attack: 105
+# alpha for sound highlight
+sound_alpha: 86
+# alpha for tile grid lines
+grid_alpha: 8
+# alpha for tiles that are visible
+grid_alpha_visible: 80
+# alpha for several overlays 
+grid_alpha_overlay: 150
+# cursor sprite alpha
+cursor_alpha: 230
+# alpha for sidebar
+sidebar_alpha: 125
+sidebar_percent_of_screen: 0.45
+sidebar_speed: 2.0
+# Impression sprite alpha
+impression_alpha: 200
+
+# throttle to frame rate
+frame_rate: 30
+
+# animation speeds
+player_attack_speed: 1.0
+player_attack_hammer_speed: 1.0
+player_vault_sprite_speed: 2.0
+player_vault_move_speed: 2.0
+idle_speed: 6
+vault_speed: 20
+vault_duration: 0.2
+fire_speed: 7
+armil_explode_speed: 7
+grass_idle_speed: 3.5
+item_throw_speed: 14.0
+key_speed: 5.0
+
+sound_timeout: 0.5
+# radius of a yell's sound
+yell_radius: 4
+# distance of entities you can swap with
+swap_radius: 4
+# radius of ping skill sound
+ping_sound_radius: 3
+# show fog of war
+fog_of_war: true
+# Seed cache growth radius
+seed_cache_radius: 1
+# Radius to spawn smoke when using a smoke bomb
+smoke_bomb_radius: 1
+blink_radius: 4
+
+# Easing functions to use for sound.
+# See src/math/easing.zig for valid values.
+sound_ease_in: linearInterpolation
+sound_ease_out: linearInterpolation
+
+cursor_easing: linearInterpolation
+
+# initial player health
+player_health: 3
+# max player health
+player_health_max: 6
+# initial golem health
+golem_health: 3
+
+# initial player stamina
+player_stamina: 3
+# max player stamina
+player_stamina_max: 3
+
+# initial player energy
+player_energy: 3
+# max player energy
+player_energy_max: 6
+
+player_throw_dist: 4
+player_sling_dist: 7
+
+# alpha of explored but not visible tiles
+explored_alpha: 160
+# alpha of tiles just beyond field of view
+fov_edge_alpha: 80
+
+# sound radius for different actions
+sound_rubble_radius: 1
+sound_grass_radius: 1
+sound_radius_crushed: 3
+sound_radius_attack: 3
+sound_radius_trap: 3
+sound_radius_monster: 3
+sound_radius_stone: 3
+sound_radius_player: 3
+sound_radius_hammer: 3
+sound_radius_sneak: 1
+sound_radius_walk: 2
+sound_radius_run: 4
+sound_golem_idle_radius: 0
+# sound radius from hits with different weapon types
+sound_radius_blunt: 4
+sound_radius_pierce: 3
+sound_radius_slash: 2
+# The extra tiles of sound for a strong hit
+# like a running spear.
+sound_radius_extra: 1
+sound_radius_explosion: 4
+
+freeze_trap_radius: 3
+freeze_trap_num_turns: 5
+push_stun_turns: 3
+# Stones do not stun the golem to allow the player to attract their attention by hitting them with a stone.
+# If they got stunned they would not know where to look.
+stun_turns_throw_stone: 0
+stun_turns_throw_spear: 3
+stun_turns_throw_default: 1
+stun_turns_push_against_wall: 2
+
+# draw numeric overlay of diagonal offsets
+overlay_directions: false
+# draw player FOV in green tiles
+overlay_player_fov: false
+overlay_floodfill: false
+
+fov_radius_golem: 5
+fov_radius_player: 5
+
+# sound dampening per full-tile wall
+dampen_blocked_tile: 3
+# sound dampening per short inter-tile wall
+dampen_short_wall: 1
+# sound dampening per tall inter-tile wall
+dampen_tall_wall: 2
+
+# how far to move cursor when shift is held
+cursor_fast_move_dist: 3
+
+# delay before a key is repeated (seconds)
+repeat_delay: 0.35
+
+# whether to write out a map distribution file
+write_map_distribution: false
+
+# print each key that is pressed
+print_key_log: false
+
+# golem beam visual duration in frames
+beam_duration: 5
+
+# draw arrows on tiles to indicate entity facing direction
+draw_directional_arrow: false
+
+# Stun durations for weapons
+stun_turns_blunt: 6
+stun_turns_pierce: 4
+stun_turns_slash: 12
+stun_turns_extra: 2
+
+# alpha value used when rendering an entity ghost
+ghost_alpha: 125
+
+# particle effect settings
+particles_enabled: true
+particle_prob: 0.5
+particle_max_length: 4
+particle_duration_min: 3.0
+particle_duration_max: 5.0
+
+attack_animation_speed: 25.0
+cursor_fade_seconds: 0.25
+
+# time to move cursor, or 0 to move immediately.
+cursor_move_seconds: 0.10
+
+# Whether or not to print messages
+minimal_output: false
+
+# Whether or not to save the game between turns and load it on startup.
+# When the player loses, the game is delete.
+save_load: true
+
+# Debug option for drawing a line from the player to the cursor.
+cursor_line: false
+
+# Debug option to display positions that effect FoV blocking between the player
+# and the cursor. These are the positions that where fog or other effects will
+# effect LoS.
+blocking_positions: false
+
+# Number of tiles that a smoke bomb reduces the FoV
+smoke_bomb_fov_block: 2
+
+# Number of turns before smoke dissipates
+smoke_turns: 6
+
+# Number of tiles around a smoke bomb to create smoke
+smoke_bomb_radius: 1
+
+# Magification of a thrown looking glass
+looking_glass_magnify_amount: 2
+
+# number of frames to render hp numbers
+hp_render_duration: 20
+
+# render arrow on impressions showing their facing
+render_impression_facing: true
+render_impression_sprites: true
+
+x_offset_buttons: 0.05
+y_offset_buttons: 1.6
+x_spacing_buttons: 4.30
+y_spacing_buttons: 2.6
+x_scale_buttons: 4.00
+y_scale_buttons: 1.50
+
+move_tiles_sneak: 1
+move_tiles_walk: 1
+move_tiles_run: 2
+
+ui_inv_name_x_offset: 2.58
+ui_inv_name_y_offset: 0.2
+ui_inv_name_second_x_offset: 0.1
+ui_inv_name_second_y_offset: 0.25
+ui_inv_name_scale: 0.8
+
+ui_long_name_scale: 0.65
+
+ui_help_text_scale: 1.0
+
+ui_button_char_x_offset: 0.13
+ui_button_char_y_offset: -0.25
+ui_button_char_scale: 1.6
+
+stunned_overlay_scale: 0.18
+stunned_overlay_offset: 0.02
+
+# How many lines of message output to display in info panel
+display_console_lines: 8
+
+# If false, display the whole map.
+# If true, center the map around the player.
+display_center_map_on_player: true
+
+# Enable profiling
+use_profiling: true
+
+# Edge of map before the window follows the player.
+# For example a value of 2 means that the map window will move when the player
+# tries to move within 2 cells of the edge.
+map_window_edge: 2
+# Distance from the player to the edge of the map window.
+# For example, a value of 4 results in a 9x9 box, 4 cells to each size of the player.
+map_window_x: 34
+map_window_y: 7
+
+# Golem configuration
+gol_attack_distance: 5
+gol_move_distance: 1
+spire_move_distance: 1
+spire_attack_distance: 5
+pawn_move_distance: 1
+pawn_attack_distance: 1
+rook_move_distance: 1
+rook_attack_distance: 5
+armil_move_distance: 1
+
+# Number of turns before armil explodes
+armil_turns_armed: 0
+armil_explosion_radius: 2
+
+lantern_illuminate_radius: 2
+skill_grass_shoes_turns: 6
+skill_grass_throw_radius: 4
+skill_illuminate_radius: 2
+skill_heal_amount: 2
+skill_farsight_fov_amount: 1
+skill_push_stun_turns: 3
+skill_sprint_amount: 3
+skill_roll_amount: 2
+skill_stone_skin_turns: 4
+skill_swift_distance: 4
+skill_quick_reflexes_percent: 0.5
+
+# Color Palette
+color_dark_brown: 30 25 15 255
+color_medium_brown: 110 90 80 255
+color_light_green: 110 180 32 255
+color_tile_blue_light: 10 40 63 255
+color_tile_blue_dark: 2 17 35 255
+color_light_brown: 158 134 100 255
+color_ice_blue: 0 128 255 255
+color_dark_blue: 0 0 64 255
+color_very_dark_blue: 1 10 18 255
+color_orange: 217 54 0 255
+color_red: 102 0 0 255
+color_light_red: 0xDC 0x14 0x3C 0xFF
+color_medium_grey: 40 40 40 255
+color_mint_green: 146 197 127 255
+color_blueish_grey: 45 45 65 255
+color_pink: 210 137 154 255
+color_rose_red: 104 43 58 255
+color_light_orange: 246 148 12 255
+color_bone_white: 24 226 183 255
+color_warm_grey: 99 95 82 255
+color_soft_green: 172 216 172 255
+color_light_grey: 132 132 132 255
+color_shadow: 255 255 255 200
+
+recording_enabled: true

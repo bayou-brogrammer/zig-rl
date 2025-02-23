@@ -1,0 +1,26 @@
+? to bring up this help menu
+
+Press enter to continue to the next help screen.
+
+esc to bring up the main menu, or exit the current menu
+
+Arrow keys or number keys to move.
+    There is 8 directional movement.
+
+Items:
+To use an item:
+Z is always the primary item.
+    This will present options for how to apply the item
+
+X is a consumable item.
+    Using a consumable will either act immediately,
+    or present options for where to use the item.
+
+C is always for stones.
+    Using a stone will present directions to throw.
+
+Hold shift to perform 'fast' actions.
+    When moving shift will run
+    When moving the cursor, shift will move two tiles instead of one
+    When using an item, shift may cause an alternate movement or use
+

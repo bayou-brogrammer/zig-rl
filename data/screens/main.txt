@@ -1,0 +1,9 @@
+start
+classSelect
+skillSelect
+level 25 25 null procgen proccmds.txt rightEdge
+win
+#skillSelect
+#level 25 25 null procgen proccmds.txt rightEdge
+#skillSelect
+#level 25 25 null procgen proccmds.txt rightEdge

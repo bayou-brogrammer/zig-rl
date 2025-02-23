@@ -1,0 +1,28 @@
+items sword 1 3
+items spear 1 3
+items dagger 1 3
+items axe 1 3
+items lantern 1 3
+items herb 1 3
+items seedOfStone 1 3
+items sling 1 3
+items seedCache 1 3
+items smokeBomb 1 3
+items khopesh 1 3
+items glassEye 1 3
+maxItems 8
+entities gol 1 3
+entities pawn 1 3
+entities rook 1 3
+entities armil 1 3
+traps spikeTrap 1 3
+traps soundTrap 1 3
+traps blinkTrap 1 3
+traps freezeTrap 1 3
+maxTraps 5
+maxGates 5
+rubble 15
+stones 5 10
+grass 6 13 4 0.5
+vaults 0
+chasms 0 3

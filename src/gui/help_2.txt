@@ -1,0 +1,22 @@
+? to bring up this help menu
+
+esc to bring up the main menu, or exit the current menu
+
+Hold ctrl to perform 'slow' actions.
+    When moving ctrl will sneak
+    In cursor mode, ctrl will keep the cursor next to the player
+    In cursor mode, ctrl may cause an alternate movement or use
+    Tab returns the cursor to the player's tile.
+
+Space enters cursor mode
+    Use the arrow keys or number keys to move the cursor.
+    Extra information is given for tiles under the cursor.
+    Hold shift for fast movement.
+    Hold ctrl for tiles around the player.
+
+Skills:
+h brings up the class menu.
+    Currently, a class may be selected at any time.
+j brings up the skill list.
+a, s, d uses the corresponding skill.
+    Skills may apply immediately or show direction.

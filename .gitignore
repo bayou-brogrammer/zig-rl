@@ -1,0 +1,11 @@
+src/zig-cache/
+zig-cache/
+zig-out/
+.zig-cache/
+
+tags
+rrl_save
+map_image.png
+output.txt
+rrl.log
+.aider*
