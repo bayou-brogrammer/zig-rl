@@ -1,0 +1,8 @@
+.{
+    .name = "rrl2",
+    .version = "0.0.0",
+    .paths = .{""},
+    .dependencies = .{
+        .sdl = .{ .url = "git+https://github.com/jethrodaniel/SDL.zig#61f2fbb0800c1d67f23c78d17e90ed1409ae3349", .hash = "1220669f332df7d253be92fbea2f36ffe1ae3ca004e496eb78ff06f93dd79d59c76d" },
+    },
+}

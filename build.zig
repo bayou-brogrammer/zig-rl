@@ -19,10 +19,21 @@ var tcl_extension: ModulePair = undefined;
 pub fn build(b: *Builder) !void {
     const target = b.standardTargetOptions(.{});
     const mode = b.standardOptimizeOption(.{});
-
     const step_options = b.addOptions();
 
-    try initModules(b);
+    const sdl_dep = b.dependency("sdl", .{});
+    const module = b.addModule("sdl", .{
+        .root_source_file = b.addWriteFiles().add("src/lib.zig",
+            \\pub const c = @cImport({
+            \\    @cInclude("SDL3/SDL.h");
+            \\    @cInclude("SDL3_ttf/SDL_ttf.h");
+            \\    @cInclude("SDL3_image/SDL_image.h");
+            \\});
+        ),
+        .link_libc = true,
+    });
+
+    try initModules(b, target, sdl_dep, module);
 
     if (builtin.os.tag == .windows) {
         // Move dlls to bin directory so Windows can find them.
@@ -31,15 +42,15 @@ pub fn build(b: *Builder) !void {
         b.installFile("lib/SDL2_image.dll", "bin/SDL2_image.dll");
     }
 
-    buildMain(b, target, mode, step_options);
+    buildMain(b, target, mode, step_options, sdl_dep);
     // buildTests(b, target, mode, step_options);
 
     // buildTclExtension(b, target, mode, step_options);
-    try runAtlas(b, target, mode);
+    // try runAtlas(b, target, mode);
 }
 
 // Main Executable
-fn buildMain(b: *Builder, target: std.Build.ResolvedTarget, mode: std.builtin.Mode, step_options: *std.Build.Step.Options) void {
+fn buildMain(b: *Builder, target: std.Build.ResolvedTarget, mode: std.builtin.Mode, step_options: *std.Build.Step.Options, sdl_dep: *std.Build.Dependency) void {
     const exe = b.addExecutable(.{
         .name = "rustrl",
         .root_source_file = .{ .cwd_relative = "main.zig" },
@@ -48,8 +59,6 @@ fn buildMain(b: *Builder, target: std.Build.ResolvedTarget, mode: std.builtin.Mo
         //.use_llvm = false,
         //.use_lld = false,
     });
-
-    exe.linkLibC();
 
     if (builtin.os.tag == .windows) {
         exe.linkSystemLibrary("tcl86");
@@ -61,8 +70,9 @@ fn buildMain(b: *Builder, target: std.Build.ResolvedTarget, mode: std.builtin.Mo
 
     addRemotery(exe);
 
-    addCDeps(exe);
-    linkTcl(b, exe);
+    exe.linkLibC();
+    addCDeps(exe, sdl_dep);
+    // linkTcl(b, exe);
 
     exe.root_module.addImport("zigtcl", tcl_extension.module);
     addModules(b, exe);
@@ -74,16 +84,7 @@ fn buildMain(b: *Builder, target: std.Build.ResolvedTarget, mode: std.builtin.Mo
         run_cmd.addArgs(args);
     }
 
-    exe.addIncludePath(.{ .cwd_relative = "deps/SDL2/include" });
-    exe.addLibraryPath(.{ .cwd_relative = "lib" });
-    exe.linkSystemLibrary("SDL2");
-    exe.linkSystemLibrary("SDL2_ttf");
-    exe.linkSystemLibrary("SDL2_image");
-
-    exe.addIncludePath(.{ .cwd_relative = "deps/tcl/include" });
-
     const rustrl_step = b.step("rustrl", "Build the zig version of the game");
-    //rustrl_step.dependOn(&exe.step);
     rustrl_step.dependOn(b.getInstallStep());
 
     const run_step = b.step("run", "Run the zig version of the game");
@@ -92,19 +93,15 @@ fn buildMain(b: *Builder, target: std.Build.ResolvedTarget, mode: std.builtin.Mo
 
 // Unit tests
 fn buildTests(b: *Builder, target: std.Build.ResolvedTarget, mode: std.builtin.Mode, step_options: *std.Build.Step.Options) void {
-    const board_step = buildModuleTest(b, "board"[0..], "src/board/board.zig"[0..], target, mode, step_options);
     const engine_step = buildModuleTest(b, "engine"[0..], "src/engine/engine.zig"[0..], target, mode, step_options);
     const core_step = buildModuleTest(b, "core"[0..], "src/core/core.zig"[0..], target, mode, step_options);
-    const drawing_step = buildModuleTest(b, "drawing"[0..], "src/drawing/drawing.zig"[0..], target, mode, step_options);
     const gui_step = buildModuleTest(b, "gui"[0..], "src/gui/gui.zig"[0..], target, mode, step_options);
     const math_step = buildModuleTest(b, "math"[0..], "src/math/math.zig"[0..], target, mode, step_options);
     const utils_step = buildModuleTest(b, "utils"[0..], "src/utils/utils.zig"[0..], target, mode, step_options);
 
     const test_step = b.step("test", "Run all tests");
-    test_step.dependOn(board_step);
     test_step.dependOn(engine_step);
     test_step.dependOn(core_step);
-    test_step.dependOn(drawing_step);
     test_step.dependOn(gui_step);
     test_step.dependOn(math_step);
     test_step.dependOn(utils_step);
@@ -120,7 +117,7 @@ fn buildModuleTest(b: *Builder, name: []const u8, path: []const u8, target: std.
 
     exe_tests.root_module.addOptions("build_options", step_options);
 
-    addCDeps(exe_tests);
+    // addCDeps(exe_tests);
     linkTcl(b, exe_tests);
 
     addRemotery(exe_tests);
@@ -143,29 +140,6 @@ fn buildModuleTest(b: *Builder, name: []const u8, path: []const u8, target: std.
     test_step.dependOn(&run_tests.step);
 
     return test_step;
-}
-
-// Shared Library TCL Extension
-fn buildTclExtension(b: *Builder, target: std.Build.ResolvedTarget, mode: std.builtin.Mode, step_options: *std.Build.Step.Options) void {
-    const lib = b.addSharedLibrary(
-        .{ .name = "rrl", .root_source_file = .{ .cwd_relative = "tclrrl.zig" }, .target = target, .optimize = mode },
-    );
-    lib.linkLibC();
-
-    lib.root_module.addOptions("build_options", step_options);
-
-    addRemotery(lib);
-
-    addCDeps(lib);
-    linkTcl(b, lib);
-
-    lib.root_module.addImport("zigtcl", tcl_extension.module);
-    addModules(b, lib);
-
-    b.installArtifact(lib);
-
-    const lib_step = b.step("tcl", "Build TCL extension");
-    lib_step.dependOn(&lib.step);
 }
 
 // Run Atlas Process
@@ -220,7 +194,7 @@ fn runAtlas(b: *Builder, target: std.Build.ResolvedTarget, mode: std.builtin.Mod
     run_step.dependOn(&tileset_cmd.step);
 }
 
-fn initModules(b: *Builder) !void {
+fn initModules(b: *Builder, target: std.Build.ResolvedTarget, sdl_dep: *std.Build.Dependency, sdl_module: *std.Build.Module) !void {
     const zigtcl = b.createModule(.{ .root_source_file = .{ .cwd_relative = "deps/zig_tcl/zigtcl.zig" }, .imports = &.{} });
     zigtcl.addIncludePath(.{ .cwd_relative = "deps/tcl/include" });
     tcl_extension = ModulePair{ .name = "zigtcl", .module = zigtcl };
@@ -277,7 +251,8 @@ fn initModules(b: *Builder) !void {
     engine.addIncludePath(.{ .cwd_relative = "deps/wfc" });
     engine.addCSourceFile(.{ .file = .{ .cwd_relative = "deps/wfc/wfc.c" }, .flags = &[_][]const u8{"-DWFC_USE_STB"} });
 
-    var gui = b.createModule(.{
+    const gui = b.createModule(.{
+        .target = target,
         .root_source_file = .{ .cwd_relative = "src/gui/gui.zig" },
         .imports = &[_]Import{
             .{ .name = "core", .module = core },
@@ -286,9 +261,14 @@ fn initModules(b: *Builder) !void {
             .{ .name = "utils", .module = utils },
             .{ .name = "engine", .module = engine },
             .{ .name = "prof", .module = prof },
+            .{ .name = "sdl", .module = sdl_module },
         },
     });
-    gui.addIncludePath(.{ .cwd_relative = "deps/SDL2/include" });
+
+    gui.linkLibrary(sdl_dep.artifact("SDL3"));
+    gui.linkLibrary(sdl_dep.artifact("SDL3_ttf"));
+    gui.addIncludePath(.{ .cwd_relative = "/opt/homebrew/include" });
+    // gui.linkSystemLibrary("SDL3_image", .{ .needed = true });
 
     var module_list = std.ArrayList(ModulePair).init(b.allocator);
 
@@ -313,19 +293,14 @@ fn addModules(b: *Builder, step: *std.Build.Step.Compile) void {
     }
 }
 
-fn addCDeps(step: *std.Build.Step.Compile) void {
+fn addCDeps(step: *std.Build.Step.Compile, sdl_dep: *std.Build.Dependency) void {
     // Add SDL2 dependency
     if (builtin.os.tag == .windows) {
-        //step.addLibraryPath(.{ .cwd_relative = "deps/SDL2/lib"});
-        //step.addLibraryPath(.{ .cwd_relative = "."});
-        //step.addLibraryPath(.{ .cwd_relative = "lib" });
         step.addIncludePath(.{ .cwd_relative = "deps/tcl/include" });
-        step.addIncludePath(.{ .cwd_relative = "deps/SDL2/include" });
     }
-    step.addIncludePath(.{ .cwd_relative = "deps/SDL2/include" });
-    step.linkSystemLibrary("SDL2");
-    step.linkSystemLibrary("SDL2_ttf");
-    step.linkSystemLibrary("SDL2_image");
+
+    step.linkLibrary(sdl_dep.artifact("SDL3"));
+    step.linkLibrary(sdl_dep.artifact("SDL3_ttf"));
 
     //step.addIncludePath(.{ .cwd_relative = "deps/wfc" });
     //step.addCSourceFile(.{ .file = .{ .cwd_relative = "deps/wfc/wfc.c" }, .flags = &[_][]const u8{"-DWFC_USE_STB"} });
@@ -338,6 +313,29 @@ fn addRemotery(step: *std.Build.Step.Compile) void {
             "-DRMT_ENABLED=1 -pthread",
         } });
     }
+}
+
+// Shared Library TCL Extension
+fn buildTclExtension(b: *Builder, target: std.Build.ResolvedTarget, mode: std.builtin.Mode, step_options: *std.Build.Step.Options) void {
+    const lib = b.addSharedLibrary(
+        .{ .name = "rrl", .root_source_file = .{ .cwd_relative = "tclrrl.zig" }, .target = target, .optimize = mode },
+    );
+    lib.linkLibC();
+
+    lib.root_module.addOptions("build_options", step_options);
+
+    addRemotery(lib);
+
+    addCDeps(lib);
+    linkTcl(b, lib);
+
+    lib.root_module.addImport("zigtcl", tcl_extension.module);
+    addModules(b, lib);
+
+    b.installArtifact(lib);
+
+    const lib_step = b.step("tcl", "Build TCL extension");
+    lib_step.dependOn(&lib.step);
 }
 
 fn linkTcl(b: *Builder, step: *std.Build.Step.Compile) void {

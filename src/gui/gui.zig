@@ -139,7 +139,10 @@ pub const Gui = struct {
 
         var width: c_int = 0;
         var height: c_int = 0;
-        sdl2.SDL_GetWindowSize(disp.window, &width, &height);
+        if (!sdl2.SDL_GetWindowSize(disp.window, &width, &height)) {
+            std.log.warn("Failed to get window size", .{});
+        }
+
         const panels = try Panels.init(@as(i32, @intCast(width)), @as(i32, @intCast(height)), &disp, allocator);
 
         const state = DisplayState.init(allocator);
@@ -217,7 +220,7 @@ pub const Gui = struct {
         config.outline = true;
 
         // Immediate mode GUI.
-        gui.imm.pos = Pos.init(0, 0);
+        gui.imm.pos = Pos.init(10, 10);
 
         const new_game_click = try gui.imm.button(gui.panels.screen.panel, gui.game.input.mouse, "new_game", " new game ", config);
         const new_game = new_game_click == .up;
@@ -351,7 +354,7 @@ pub const Gui = struct {
         const prev_mouse_state = gui.game.input.mouse;
 
         var event: sdl2.SDL_Event = undefined;
-        while (sdl2.SDL_PollEvent(&event) != 0) {
+        while (sdl2.SDL_PollEvent(&event)) {
             if (keyboard.translateEvent(event)) |input_event| {
                 try input_buffer.append(input_event);
             }

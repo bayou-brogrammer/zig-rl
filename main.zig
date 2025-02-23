@@ -21,6 +21,8 @@ const zt = @import("zigtcl");
 const sdl2 = g.sdl2;
 const logging = @import("src/logging.zig");
 
+const sdl = @import("sdl");
+
 pub const std_options: std.Options = .{
     .logFn = logging.logFn,
     .log_level = .info,
@@ -62,24 +64,22 @@ pub fn main() anyerror!void {
     std.process.cleanExit();
 }
 
+fn initGui(args: Args, allocator: Allocator) !Gui {
+    var gui = try g.Gui.init(args.seed, allocator);
+    try gui.resolveMessages();
+    return gui;
+}
+
 fn runGui(gui: *Gui) !void {
-    var ticks = sdl2.SDL_GetTicks64();
+    var ticks = sdl2.SDL_GetTicks();
 
     zt.interp = zt.tcl.Tcl_CreateInterp();
 
     while (try gui.step(ticks)) {
         // NOTE this is pretty primitive. Consider a better frame limiter.
         std.time.sleep(1000000000 / gui.game.config.frame_rate);
-        ticks = sdl2.SDL_GetTicks64();
+        ticks = sdl2.SDL_GetTicks();
     }
-}
-
-fn initGui(args: Args, allocator: Allocator) !Gui {
-    var gui = try g.Gui.init(args.seed, allocator);
-
-    try gui.resolveMessages();
-
-    return gui;
 }
 
 fn parseArgs(allocator: Allocator) !Args {

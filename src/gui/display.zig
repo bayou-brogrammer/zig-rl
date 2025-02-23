@@ -35,17 +35,17 @@ pub const Display = struct {
     allocator: Allocator,
 
     pub fn init(window_name: [*c]const u8, window_width: c_int, window_height: c_int, allocator: Allocator) !Display {
-        if (sdl2.SDL_Init(sdl2.SDL_INIT_VIDEO) != 0) {
+        if (!sdl2.SDL_Init(sdl2.SDL_INIT_VIDEO)) {
             sdl2.SDL_Log("Unable to initialize SDL: %s", sdl2.SDL_GetError());
             return error.SDLInitializationFailed;
         }
 
-        if (sdl2.TTF_Init() == -1) {
+        if (!sdl2.TTF_Init()) {
             sdl2.SDL_Log("Unable to initialize SDL_ttf: %s", sdl2.SDL_GetError());
             return error.SDLInitializationFailed;
         }
 
-        const window = sdl2.SDL_CreateWindow(window_name, sdl2.SDL_WINDOWPOS_UNDEFINED, sdl2.SDL_WINDOWPOS_UNDEFINED, window_width, window_height, sdl2.SDL_WINDOW_OPENGL) orelse {
+        const window = sdl2.SDL_CreateWindow(window_name, window_width, window_height, sdl2.SDL_WINDOW_OPENGL) orelse {
             sdl2.SDL_Log("Unable to create window: %s", sdl2.SDL_GetError());
             return error.SDLInitializationFailed;
         };
@@ -55,7 +55,7 @@ pub const Display = struct {
             sdl2.SDL_HideWindow(window);
         }
 
-        const renderer = sdl2.SDL_CreateRenderer(window, -1, sdl2.SDL_RENDERER_ACCELERATED) orelse {
+        const renderer = sdl2.SDL_CreateRenderer(window, null) orelse {
             sdl2.SDL_Log("Unable to create renderer: %s", sdl2.SDL_GetError());
             return error.SDLInitializationFailed;
         };
@@ -119,7 +119,7 @@ pub const Display = struct {
         display.useTexturePanel(target);
         const src_rect = sdl2Rect(source.panel.getRectFromArea(source_area));
         const dst_rect = sdl2Rect(target.panel.getRectFromArea(target_area));
-        _ = sdl2.SDL_RenderCopy(display.renderer, source.texture, &src_rect, &dst_rect);
+        _ = sdl2.SDL_RenderTexture(display.renderer, source.texture, &src_rect, &dst_rect);
     }
 
     /// Paste an area of one texture onto an area of another texture, while maintaining the aspect ratio of the original texture,
@@ -143,7 +143,7 @@ pub const Display = struct {
 
         const sdl2_src_rect = sdl2Rect(src_rect);
         const sdl2_dst_rect = sdl2Rect(dst_rect);
-        _ = sdl2.SDL_RenderCopy(display.renderer, source.texture, &sdl2_src_rect, &sdl2_dst_rect);
+        _ = sdl2.SDL_RenderTexture(display.renderer, source.texture, &sdl2_src_rect, &sdl2_dst_rect);
     }
 
     pub fn overlayTexture(display: *Display, target: *TexturePanel, target_area: Rect, source: *TexturePanel, source_area: Rect, alpha: u8) void {
@@ -157,7 +157,7 @@ pub const Display = struct {
 
         const sdl2_src_rect = sdl2Rect(src_rect);
         const sdl2_dst_rect = sdl2Rect(dst_rect);
-        _ = sdl2.SDL_RenderCopy(display.renderer, source.texture, &sdl2_src_rect, &sdl2_dst_rect);
+        _ = sdl2.SDL_RenderTexture(display.renderer, source.texture, &sdl2_src_rect, &sdl2_dst_rect);
     }
 
     /// Draw a texture panel onto the screen and present it to the user. The entire texture is drawn on the
@@ -167,9 +167,11 @@ pub const Display = struct {
     pub fn present(display: *Display, texture_panel: *TexturePanel) void {
         _ = sdl2.SDL_SetRenderTarget(display.renderer, null);
 
-        _ = sdl2.SDL_RenderCopy(display.renderer, texture_panel.texture, null, null);
+        _ = sdl2.SDL_RenderTexture(display.renderer, texture_panel.texture, null, null);
 
-        sdl2.SDL_RenderPresent(display.renderer);
+        if (!sdl2.SDL_RenderPresent(display.renderer)) {
+            sdl2.SDL_Log("Unable to present renderer: %s", sdl2.SDL_GetError());
+        }
     }
 
     pub fn texturePanel(display: *Display, panel: Panel, allocator: Allocator) !TexturePanel {
@@ -221,7 +223,7 @@ pub const Display = struct {
         var event: sdl2.SDL_Event = undefined;
         while (sdl2.SDL_PollEvent(&event) != 0) {
             switch (event.type) {
-                sdl2.SDL_QUIT => {
+                sdl2.SDL_EVENT_QUIT => {
                     quit = true;
                 },
 

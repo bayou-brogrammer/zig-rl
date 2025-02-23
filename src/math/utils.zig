@@ -2,7 +2,7 @@ const std = @import("std");
 
 const Pos = @import("pos.zig").Pos;
 
-pub const ASCII_START: i32 = 32;
+pub const ASCII_START: i32 = 33;
 pub const ASCII_END: i32 = 127;
 
 pub const Color = packed struct {

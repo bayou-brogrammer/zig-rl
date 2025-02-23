@@ -66,28 +66,34 @@ pub const AsciiTexture = struct {
         }
         chrs[math.utils.ASCII_END + 1] = 0;
 
-        const text_surface = sdl2.TTF_RenderUTF8_Blended(font, chrs[math.utils.ASCII_START..math.utils.ASCII_END], Sdl2Color(Color.white()));
-        defer sdl2.SDL_FreeSurface(text_surface);
+        const txt = chrs[math.utils.ASCII_START..math.utils.ASCII_END];
+
+        const text_surface = sdl2.TTF_RenderText_Blended(font, txt.ptr, txt.len, Sdl2Color(Color.white()));
+        defer sdl2.SDL_DestroySurface(text_surface);
 
         const font_texture = sdl2.SDL_CreateTextureFromSurface(renderer, text_surface) orelse {
             sdl2.SDL_Log("Unable to create sprite texture: %s", sdl2.SDL_GetError());
             return error.SDLInitializationFailed;
         };
 
-        var format: u32 = undefined;
-        var access: c_int = undefined;
-        var w: c_int = undefined;
-        var h: c_int = undefined;
-        _ = sdl2.SDL_QueryTexture(font_texture, &format, &access, &w, &h);
+        var w: f32 = undefined;
+        var h: f32 = undefined;
+        _ = sdl2.SDL_GetTextureSize(font_texture, &w, &h);
 
         const ascii_width = math.utils.ASCII_END - math.utils.ASCII_START;
+
+        const width = @as(i32, @intFromFloat(w));
+        const height = @as(i32, @intFromFloat(h));
+        const char_width = @divFloor(@as(i32, @intFromFloat(w)), @as(i32, @intCast(ascii_width)));
+        const char_height = @as(i32, @intFromFloat(h));
+
         const ascii_texture = AsciiTexture.init(
             font_texture,
             ascii_width,
-            @as(i32, @intCast(w)),
-            @as(i32, @intCast(h)),
-            @divFloor(@as(i32, @intCast(w)), @as(i32, @intCast(ascii_width))),
-            @as(i32, @intCast(h)),
+            width,
+            height,
+            char_width,
+            char_height,
         );
 
         return ascii_texture;
@@ -147,7 +153,7 @@ pub fn processTextGeneric(canvas: Canvas, text: [128]u8, len: usize, color: Colo
             @as(i32, @intCast(char_dims.height)),
         );
 
-        _ = sdl2.SDL_RenderCopyEx(canvas.renderer, canvas.ascii_texture.texture, &Sdl2Rect(src_rect), &Sdl2Rect(dst_rect), 0.0, null, 0);
+        _ = sdl2.SDL_RenderTextureRotated(canvas.renderer, canvas.ascii_texture.texture, &Sdl2Rect(src_rect), &Sdl2Rect(dst_rect), 0.0, null, 0);
         x_offset += @as(i32, @intCast(char_dims.width));
     }
 }
@@ -293,70 +299,16 @@ pub fn processRectFloatCmd(canvas: Canvas, params: drawing.drawcmd.DrawRectFloat
     }
 }
 
-pub fn processSpriteCmd(canvas: Canvas, params: drawing.drawcmd.DrawSprite) void {
-    const sprite_sheet = &canvas.sprites.sheets.get(params.sprite.key).?;
-    const cell_dims = canvas.panel.cellDims();
-
-    const x = params.pos.x * @as(i32, @intCast(cell_dims.width));
-    const y = params.pos.y * @as(i32, @intCast(cell_dims.height));
-    const pos = Pos.init(x, y);
-
-    // Negative positions are accepted, but not drawn.
-    if (pos.x < 0 or pos.y < 0) {
-        return;
-    }
-
-    const src_rect = sprite_sheet.spriteSrc(params.sprite.index);
-    const dst_x = @as(i32, @intCast(pos.x));
-    const dst_y = @as(i32, @intCast(pos.y));
-    const dst_width = @as(i32, @intCast(cell_dims.width));
-    const dst_height = @as(i32, @intCast(cell_dims.height));
-    const dst_rect = Rect.initAt(dst_x, dst_y, dst_width, dst_height);
-
-    // NOTE(error) ignoring error return.
-    _ = sdl2.SDL_SetTextureBlendMode(canvas.target, sdl2.SDL_BLENDMODE_BLEND);
-
-    // NOTE(error) ignoring error return.
-    _ = sdl2.SDL_SetTextureColorMod(canvas.sprites.texture, params.color.r, params.color.g, params.color.b);
-    // NOTE(error) ignoring error return.
-    _ = sdl2.SDL_SetTextureAlphaMod(canvas.sprites.texture, params.color.a);
-
-    // NOTE(error) ignoring error return.
-    _ = sdl2.SDL_RenderCopyEx(
-        canvas.renderer,
-        canvas.sprites.texture,
-        &Sdl2Rect(src_rect),
-        &Sdl2Rect(dst_rect),
-        params.sprite.rotation,
-        null,
-        flipFlags(&params.sprite),
-    );
-}
-
-pub fn flipFlags(spr: *const Sprite) sdl2.SDL_RendererFlip {
-    var flags: sdl2.SDL_RendererFlip = 0;
-
-    if (spr.flip_horiz) {
-        flags |= sdl2.SDL_FLIP_HORIZONTAL;
-    }
-
-    if (spr.flip_vert) {
-        flags |= sdl2.SDL_FLIP_VERTICAL;
-    }
-
-    return flags;
-}
-
 pub fn Sdl2Color(color: Color) sdl2.SDL_Color {
     return sdl2.SDL_Color{ .r = color.r, .g = color.g, .b = color.b, .a = color.a };
 }
 
-pub fn Sdl2Rect(rect: Rect) sdl2.SDL_Rect {
-    return sdl2.SDL_Rect{
-        .x = @as(c_int, @intCast(rect.x_offset)),
-        .y = @as(c_int, @intCast(rect.y_offset)),
-        .w = @as(c_int, @intCast(rect.width)),
-        .h = @as(c_int, @intCast(rect.height)),
+pub fn Sdl2Rect(rect: Rect) sdl2.SDL_FRect {
+    return sdl2.SDL_FRect{
+        .x = @as(f32, @floatFromInt(rect.x_offset)),
+        .y = @as(f32, @floatFromInt(rect.y_offset)),
+        .w = @as(f32, @floatFromInt(rect.width)),
+        .h = @as(f32, @floatFromInt(rect.height)),
     };
 }
 

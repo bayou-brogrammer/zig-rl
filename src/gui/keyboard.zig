@@ -11,16 +11,16 @@ const MouseButton = engine.input.MouseButton;
 
 pub fn translateEvent(event: sdl2.SDL_Event) ?InputEvent {
     switch (event.type) {
-        sdl2.SDL_QUIT => {
+        sdl2.SDL_EVENT_QUIT => {
             return InputEvent.quit;
         },
 
-        sdl2.SDL_KEYDOWN => {
-            const keycode: i32 = event.key.keysym.sym;
+        sdl2.SDL_EVENT_KEY_DOWN => {
+            const keycode: u32 = event.key.key;
 
             var dir = KeyDir.down;
 
-            if (event.key.repeat == 1) {
+            if (event.key.repeat) {
                 dir = KeyDir.held;
             }
 
@@ -42,10 +42,10 @@ pub fn translateEvent(event: sdl2.SDL_Event) ?InputEvent {
             return null;
         },
 
-        sdl2.SDL_KEYUP => {
-            const keycode: i32 = event.key.keysym.sym;
+        sdl2.SDL_EVENT_KEY_UP => {
+            const keycode: u32 = event.key.key;
 
-            if (event.key.repeat == 1) {
+            if (event.key.repeat) {
                 return null;
             }
 
@@ -72,7 +72,7 @@ pub fn translateEvent(event: sdl2.SDL_Event) ?InputEvent {
         },
 
         // I think this is slightly wrong if multiple buttons change at the same time.
-        sdl2.SDL_MOUSEBUTTONDOWN => {
+        sdl2.SDL_EVENT_MOUSE_BUTTON_DOWN => {
             var button: MouseButton = undefined;
             switch (event.button.button) {
                 sdl2.SDL_BUTTON_LEFT => {
@@ -90,17 +90,17 @@ pub fn translateEvent(event: sdl2.SDL_Event) ?InputEvent {
                 else => return null,
             }
 
-            const mouse_pos = Pos.init(event.button.x, event.button.y);
+            const mouse_pos = Pos.init(@intFromFloat(event.button.x), @intFromFloat(event.button.y));
             const input_event = InputEvent{ .mouse_button = .{ .button = button, .pos = mouse_pos, .key_dir = KeyDir.down } };
             return input_event;
         },
 
-        sdl2.SDL_MOUSEMOTION => {
-            return InputEvent{ .mouse_pos = .{ .x = event.motion.x, .y = event.motion.y } };
+        sdl2.SDL_EVENT_MOUSE_MOTION => {
+            return InputEvent{ .mouse_pos = .{ .x = @intFromFloat(event.motion.x), .y = @intFromFloat(event.motion.y) } };
         },
 
         // I think this is slightly wrong if multiple buttons change at the same time.
-        sdl2.SDL_MOUSEBUTTONUP => {
+        sdl2.SDL_EVENT_MOUSE_BUTTON_UP => {
             var button: MouseButton = undefined;
             switch (event.button.button) {
                 sdl2.SDL_BUTTON_LEFT => {
@@ -118,7 +118,7 @@ pub fn translateEvent(event: sdl2.SDL_Event) ?InputEvent {
                 else => return null,
             }
 
-            const mouse_pos = Pos.init(event.button.x, event.button.y);
+            const mouse_pos = Pos.init(@intFromFloat(event.button.x), @intFromFloat(event.button.y));
             const input_event = InputEvent{ .mouse_button = .{ .button = button, .pos = mouse_pos, .key_dir = KeyDir.up } };
             return input_event;
         },
@@ -129,7 +129,7 @@ pub fn translateEvent(event: sdl2.SDL_Event) ?InputEvent {
     }
 }
 
-pub fn keycodeToChar(key: i32) ?u8 {
+pub fn keycodeToChar(key: u32) ?u8 {
     return switch (key) {
         sdl2.SDLK_SPACE => ' ',
         sdl2.SDLK_COMMA => ',',
@@ -145,32 +145,32 @@ pub fn keycodeToChar(key: i32) ?u8 {
         sdl2.SDLK_7 => '7',
         sdl2.SDLK_8 => '8',
         sdl2.SDLK_9 => '9',
-        sdl2.SDLK_a => 'a',
-        sdl2.SDLK_b => 'b',
-        sdl2.SDLK_c => 'c',
-        sdl2.SDLK_d => 'd',
-        sdl2.SDLK_e => 'e',
-        sdl2.SDLK_f => 'f',
-        sdl2.SDLK_g => 'g',
-        sdl2.SDLK_h => 'h',
-        sdl2.SDLK_i => 'i',
-        sdl2.SDLK_j => 'j',
-        sdl2.SDLK_k => 'k',
-        sdl2.SDLK_l => 'l',
-        sdl2.SDLK_m => 'm',
-        sdl2.SDLK_n => 'n',
-        sdl2.SDLK_o => 'o',
-        sdl2.SDLK_p => 'p',
-        sdl2.SDLK_q => 'q',
-        sdl2.SDLK_r => 'r',
-        sdl2.SDLK_s => 's',
-        sdl2.SDLK_t => 't',
-        sdl2.SDLK_u => 'u',
-        sdl2.SDLK_v => 'v',
-        sdl2.SDLK_w => 'w',
-        sdl2.SDLK_x => 'x',
-        sdl2.SDLK_y => 'y',
-        sdl2.SDLK_z => 'z',
+        sdl2.SDLK_A => 'a',
+        sdl2.SDLK_B => 'b',
+        sdl2.SDLK_C => 'c',
+        sdl2.SDLK_D => 'd',
+        sdl2.SDLK_E => 'e',
+        sdl2.SDLK_F => 'f',
+        sdl2.SDLK_G => 'g',
+        sdl2.SDLK_H => 'h',
+        sdl2.SDLK_I => 'i',
+        sdl2.SDLK_J => 'j',
+        sdl2.SDLK_K => 'k',
+        sdl2.SDLK_L => 'l',
+        sdl2.SDLK_M => 'm',
+        sdl2.SDLK_N => 'n',
+        sdl2.SDLK_O => 'o',
+        sdl2.SDLK_P => 'p',
+        sdl2.SDLK_Q => 'q',
+        sdl2.SDLK_R => 'r',
+        sdl2.SDLK_S => 's',
+        sdl2.SDLK_T => 't',
+        sdl2.SDLK_U => 'u',
+        sdl2.SDLK_V => 'v',
+        sdl2.SDLK_W => 'w',
+        sdl2.SDLK_X => 'x',
+        sdl2.SDLK_Y => 'y',
+        sdl2.SDLK_Z => 'z',
         sdl2.SDLK_RIGHT => '6',
         sdl2.SDLK_LEFT => '4',
         sdl2.SDLK_DOWN => '2',
@@ -189,7 +189,7 @@ pub fn keycodeToChar(key: i32) ?u8 {
         sdl2.SDLK_KP_SPACE => ' ',
         sdl2.SDLK_LEFTBRACKET => '[',
         sdl2.SDLK_RIGHTBRACKET => ']',
-        sdl2.SDLK_BACKQUOTE => '`',
+        sdl2.SDLK_GRAVE => '`',
         sdl2.SDLK_BACKSLASH => '\\',
         sdl2.SDLK_QUESTION => '?',
         sdl2.SDLK_SLASH => '/',
