@@ -42,13 +42,13 @@ const prof = @import("prof");
 pub const display = @import("display.zig");
 pub const Display = display.Display;
 pub const keyboard = @import("keyboard.zig");
-pub const sdl2 = @import("sdl2.zig");
+pub const sdl3 = @import("sdl3");
 pub const panels_import = @import("panels.zig");
 pub const imm = @import("imm.zig");
 pub const Imm = imm.Imm;
 
 pub const Panels = panels_import.Panels;
-const Texture = sdl2.SDL_Texture;
+const Texture = sdl3.SDL_Texture;
 
 pub const PIXELS_PER_CELL: usize = 24;
 pub const WINDOW_WIDTH: usize = PIXELS_PER_CELL * panels_import.SCREEN_CELLS_WIDTH;
@@ -139,7 +139,7 @@ pub const Gui = struct {
 
         var width: c_int = 0;
         var height: c_int = 0;
-        if (!sdl2.SDL_GetWindowSize(disp.window, &width, &height)) {
+        if (!sdl3.SDL_GetWindowSize(disp.window, &width, &height)) {
             std.log.warn("Failed to get window size", .{});
         }
 
@@ -353,8 +353,8 @@ pub const Gui = struct {
     fn collectInputs(gui: *Gui, input_buffer: *InputBuffer) !void {
         const prev_mouse_state = gui.game.input.mouse;
 
-        var event: sdl2.SDL_Event = undefined;
-        while (sdl2.SDL_PollEvent(&event)) {
+        var event: sdl3.SDL_Event = undefined;
+        while (sdl3.SDL_PollEvent(&event)) {
             if (keyboard.translateEvent(event)) |input_event| {
                 try input_buffer.append(input_event);
             }
@@ -363,9 +363,9 @@ pub const Gui = struct {
         // SDL2 does not produce mouse 'held' events, so check mouse state
         // and previous Input mouse state to determine if the button is still
         // held this frame.
-        const mouse_state: u32 = sdl2.SDL_GetMouseState(null, null);
+        const mouse_state: u32 = sdl3.SDL_GetMouseState(null, null);
 
-        const left_clicked: bool = (mouse_state & sdl2.SDL_BUTTON_LEFT) != 0;
+        const left_clicked: bool = (mouse_state & sdl3.SDL_BUTTON_LEFT) != 0;
         if (prev_mouse_state.left != null and left_clicked) {
             const left_held = InputEvent{ .mouse_button = .{
                 .button = .left,
@@ -375,7 +375,7 @@ pub const Gui = struct {
             try input_buffer.append(left_held);
         }
 
-        const middle_clicked: bool = (mouse_state & sdl2.SDL_BUTTON_MIDDLE) != 0;
+        const middle_clicked: bool = (mouse_state & sdl3.SDL_BUTTON_MIDDLE) != 0;
         if (prev_mouse_state.middle != null and middle_clicked) {
             const middle_held = InputEvent{ .mouse_button = .{
                 .button = .middle,
@@ -385,7 +385,7 @@ pub const Gui = struct {
             try input_buffer.append(middle_held);
         }
 
-        const right_clicked: bool = (mouse_state & sdl2.SDL_BUTTON_RIGHT) != 0;
+        const right_clicked: bool = (mouse_state & sdl3.SDL_BUTTON_RIGHT) != 0;
         if (prev_mouse_state.right != null and right_clicked) {
             const right_held = InputEvent{ .mouse_button = .{
                 .button = .right,

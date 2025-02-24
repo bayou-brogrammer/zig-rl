@@ -6,6 +6,7 @@ const Allocator = std.mem.Allocator;
 
 const core = @import("core");
 const Config = core.config.Config;
+const Level = core.level.Level;
 
 pub const actions = @import("actions.zig");
 pub const input = @import("input.zig");
@@ -31,6 +32,7 @@ pub const Game = struct {
     input: Input,
     settings: Settings,
     log: MsgLog,
+    level: Level,
 
     allocator: Allocator,
     frame_allocator: Allocator,
@@ -39,12 +41,12 @@ pub const Game = struct {
         _ = seed; // autofix
         // const rng = RndGen.init(seed);
         const config = try Config.fromFile(CONFIG_PATH[0..]);
-        // const level = Level.empty(allocator);
+        const level = Level.empty();
         const log = try MsgLog.init(allocator);
 
         return Game{
             .config = config,
-            // .level = level,
+            .level = level,
             // .rng = rng,
             .log = log,
             .input = Input.init(),
@@ -56,7 +58,7 @@ pub const Game = struct {
     }
 
     pub fn deinit(game: *Game) void {
-        // game.level.deinit(game.allocator);
+        game.level.deinit(game.allocator);
         game.log.deinit();
     }
 

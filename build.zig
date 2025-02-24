@@ -21,19 +21,9 @@ pub fn build(b: *Builder) !void {
     const mode = b.standardOptimizeOption(.{});
     const step_options = b.addOptions();
 
-    const sdl_dep = b.dependency("sdl", .{});
-    const module = b.addModule("sdl", .{
-        .root_source_file = b.addWriteFiles().add("src/lib.zig",
-            \\pub const c = @cImport({
-            \\    @cInclude("SDL3/SDL.h");
-            \\    @cInclude("SDL3_ttf/SDL_ttf.h");
-            \\    @cInclude("SDL3_image/SDL_image.h");
-            \\});
-        ),
-        .link_libc = true,
-    });
+    const sdl_module = setupSDL(b);
 
-    try initModules(b, target, sdl_dep, module);
+    try initModules(b, target, sdl_module);
 
     if (builtin.os.tag == .windows) {
         // Move dlls to bin directory so Windows can find them.
@@ -42,15 +32,34 @@ pub fn build(b: *Builder) !void {
         b.installFile("lib/SDL2_image.dll", "bin/SDL2_image.dll");
     }
 
-    buildMain(b, target, mode, step_options, sdl_dep);
+    buildMain(b, target, mode, step_options);
     // buildTests(b, target, mode, step_options);
 
     // buildTclExtension(b, target, mode, step_options);
     // try runAtlas(b, target, mode);
 }
 
+fn setupSDL(b: *Builder) *std.Build.Module {
+    const sdl_dep = b.dependency("sdl", .{});
+    const sdl_module = b.addModule("sdl", .{
+        .root_source_file = b.addWriteFiles().add("src/lib.zig",
+            \\pub usingnamespace @cImport({
+            \\    @cInclude("SDL3/SDL.h");
+            \\    @cInclude("SDL3_image/SDL_image.h");
+            \\    @cInclude("SDL3_ttf/SDL_ttf.h");
+            \\});
+        ),
+        .link_libc = true,
+    });
+    sdl_module.linkLibrary(sdl_dep.artifact("SDL3"));
+    sdl_module.linkLibrary(sdl_dep.artifact("SDL3_ttf"));
+    sdl_module.addIncludePath(.{ .cwd_relative = "/opt/homebrew/include" });
+
+    return sdl_module;
+}
+
 // Main Executable
-fn buildMain(b: *Builder, target: std.Build.ResolvedTarget, mode: std.builtin.Mode, step_options: *std.Build.Step.Options, sdl_dep: *std.Build.Dependency) void {
+fn buildMain(b: *Builder, target: std.Build.ResolvedTarget, mode: std.builtin.Mode, step_options: *std.Build.Step.Options) void {
     const exe = b.addExecutable(.{
         .name = "rustrl",
         .root_source_file = .{ .cwd_relative = "main.zig" },
@@ -68,10 +77,8 @@ fn buildMain(b: *Builder, target: std.Build.ResolvedTarget, mode: std.builtin.Mo
 
     exe.root_module.addOptions("build_options", step_options);
 
-    addRemotery(exe);
-
     exe.linkLibC();
-    addCDeps(exe, sdl_dep);
+    addCDeps(exe);
     // linkTcl(b, exe);
 
     exe.root_module.addImport("zigtcl", tcl_extension.module);
@@ -117,10 +124,8 @@ fn buildModuleTest(b: *Builder, name: []const u8, path: []const u8, target: std.
 
     exe_tests.root_module.addOptions("build_options", step_options);
 
-    // addCDeps(exe_tests);
+    addCDeps(exe_tests);
     linkTcl(b, exe_tests);
-
-    addRemotery(exe_tests);
 
     exe_tests.addIncludePath(.{ .cwd_relative = "deps/tcl/include" });
     exe_tests.addIncludePath(.{ .cwd_relative = "deps/SDL2/include" });
@@ -140,6 +145,133 @@ fn buildModuleTest(b: *Builder, name: []const u8, path: []const u8, target: std.
     test_step.dependOn(&run_tests.step);
 
     return test_step;
+}
+
+fn addCDeps(step: *std.Build.Step.Compile) void {
+    // Add SDL2 dependency
+    if (builtin.os.tag == .windows) {
+        step.addIncludePath(.{ .cwd_relative = "deps/tcl/include" });
+    }
+
+    // step.addIncludePath(.{ .cwd_relative = "/opt/homebrew/include" });
+    // step.linkLibrary(sdl_dep.artifact("SDL3"));
+    // step.linkLibrary(sdl_dep.artifact("SDL3_ttf"));
+
+    //step.addIncludePath(.{ .cwd_relative = "deps/wfc" });
+    //step.addCSourceFile(.{ .file = .{ .cwd_relative = "deps/wfc/wfc.c" }, .flags = &[_][]const u8{"-DWFC_USE_STB"} });
+}
+
+fn initModules(b: *Builder, target: std.Build.ResolvedTarget, sdl_module: *std.Build.Module) !void {
+    const zigtcl = b.createModule(.{ .root_source_file = .{ .cwd_relative = "deps/zig_tcl/zigtcl.zig" }, .imports = &.{} });
+    zigtcl.addIncludePath(.{ .cwd_relative = "deps/tcl/include" });
+    tcl_extension = ModulePair{ .name = "zigtcl", .module = zigtcl };
+
+    const step_options = b.addOptions();
+    step_options.addOption(bool, "remotery", use_profiling);
+
+    const prof = b.createModule(.{
+        .root_source_file = .{ .cwd_relative = "src/prof.zig" },
+        .imports = &[_]Import{.{
+            .name = "options",
+            .module = step_options.createModule(),
+        }},
+    });
+    prof.addIncludePath(.{ .cwd_relative = "deps/remotery" });
+
+    const math = b.createModule(.{
+        .root_source_file = .{ .cwd_relative = "src/math/math.zig" },
+        .imports = &[_]Import{},
+    });
+
+    const utils = b.createModule(.{
+        .root_source_file = .{ .cwd_relative = "src/utils/utils.zig" },
+        .imports = &[_]Import{
+            .{ .name = "math", .module = math },
+        },
+    });
+
+    const board = b.createModule(.{
+        .root_source_file = .{ .cwd_relative = "src/board/board.zig" },
+        .imports = &[_]Import{
+            .{ .name = "math", .module = math },
+            .{ .name = "prof", .module = prof },
+            .{ .name = "utils", .module = utils },
+        },
+    });
+
+    const core = b.createModule(.{
+        .root_source_file = .{ .cwd_relative = "src/core/core.zig" },
+        .imports = &[_]Import{
+            .{ .name = "board", .module = board },
+            .{ .name = "utils", .module = utils },
+            .{ .name = "math", .module = math },
+            .{ .name = "prof", .module = prof },
+        },
+    });
+
+    const drawing = b.createModule(.{
+        .root_source_file = .{ .cwd_relative = "src/drawing/drawing.zig" },
+        .imports = &[_]Import{
+            .{ .name = "math", .module = math },
+            .{ .name = "utils", .module = utils },
+        },
+    });
+
+    var engine = b.createModule(.{
+        .root_source_file = .{ .cwd_relative = "src/engine/engine.zig" },
+        .imports = &[_]Import{
+            .{ .name = "board", .module = board },
+            .{ .name = "core", .module = core },
+            .{ .name = "math", .module = math },
+            .{ .name = "utils", .module = utils },
+            .{ .name = "prof", .module = prof },
+        },
+    });
+    engine.addIncludePath(.{ .cwd_relative = "deps/wfc" });
+    engine.addCSourceFile(.{ .file = .{ .cwd_relative = "deps/wfc/wfc.c" }, .flags = &[_][]const u8{"-DWFC_USE_STB"} });
+
+    const gui = b.createModule(.{
+        .target = target,
+        .root_source_file = .{ .cwd_relative = "src/gui/gui.zig" },
+        .imports = &[_]Import{
+            .{ .name = "board", .module = board },
+            .{ .name = "core", .module = core },
+            .{ .name = "math", .module = math },
+            .{ .name = "drawing", .module = drawing },
+            .{ .name = "utils", .module = utils },
+            .{ .name = "engine", .module = engine },
+            .{ .name = "prof", .module = prof },
+            .{ .name = "sdl3", .module = sdl_module },
+        },
+    });
+
+    // gui.addIncludePath(.{ .cwd_relative = "/opt/homebrew/include" });
+    // gui.linkLibrary(sdl_dep.artifact("SDL3"));
+    // gui.linkLibrary(sdl_dep.artifact("SDL3_ttf"));
+
+    var module_list = std.ArrayList(ModulePair).init(b.allocator);
+
+    try module_list.append(ModulePair{ .name = "sdl", .module = sdl_module });
+    try module_list.append(ModulePair{ .name = "prof", .module = prof });
+    try module_list.append(ModulePair{ .name = "math", .module = math });
+    try module_list.append(ModulePair{ .name = "utils", .module = utils });
+    try module_list.append(ModulePair{ .name = "board", .module = board });
+    try module_list.append(ModulePair{ .name = "core", .module = core });
+    try module_list.append(ModulePair{ .name = "drawing", .module = drawing });
+    try module_list.append(ModulePair{ .name = "engine", .module = engine });
+    try module_list.append(ModulePair{ .name = "gui", .module = gui });
+
+    // Initialize global slice of modules with the allocated array list's items slice.
+    modules = module_list.items;
+}
+
+fn addModules(b: *Builder, step: *std.Build.Step.Compile) void {
+    const step_options = b.addOptions();
+    step_options.addOption(bool, "remotery", use_profiling);
+
+    for (modules) |module| {
+        step.root_module.addImport(module.name, module.module);
+    }
 }
 
 // Run Atlas Process
@@ -194,127 +326,6 @@ fn runAtlas(b: *Builder, target: std.Build.ResolvedTarget, mode: std.builtin.Mod
     run_step.dependOn(&tileset_cmd.step);
 }
 
-fn initModules(b: *Builder, target: std.Build.ResolvedTarget, sdl_dep: *std.Build.Dependency, sdl_module: *std.Build.Module) !void {
-    const zigtcl = b.createModule(.{ .root_source_file = .{ .cwd_relative = "deps/zig_tcl/zigtcl.zig" }, .imports = &.{} });
-    zigtcl.addIncludePath(.{ .cwd_relative = "deps/tcl/include" });
-    tcl_extension = ModulePair{ .name = "zigtcl", .module = zigtcl };
-
-    const step_options = b.addOptions();
-    step_options.addOption(bool, "remotery", use_profiling);
-
-    const prof = b.createModule(.{
-        .root_source_file = .{ .cwd_relative = "src/prof.zig" },
-        .imports = &[_]Import{.{
-            .name = "options",
-            .module = step_options.createModule(),
-        }},
-    });
-
-    const math = b.createModule(.{
-        .root_source_file = .{ .cwd_relative = "src/math/math.zig" },
-        .imports = &[_]Import{},
-    });
-
-    const utils = b.createModule(.{
-        .root_source_file = .{ .cwd_relative = "src/utils/utils.zig" },
-        .imports = &[_]Import{
-            .{ .name = "math", .module = math },
-        },
-    });
-
-    const core = b.createModule(.{
-        .root_source_file = .{ .cwd_relative = "src/core/core.zig" },
-        .imports = &[_]Import{
-            .{ .name = "utils", .module = utils },
-            .{ .name = "math", .module = math },
-            .{ .name = "prof", .module = prof },
-        },
-    });
-
-    const drawing = b.createModule(.{
-        .root_source_file = .{ .cwd_relative = "src/drawing/drawing.zig" },
-        .imports = &[_]Import{
-            .{ .name = "math", .module = math },
-            .{ .name = "utils", .module = utils },
-        },
-    });
-
-    var engine = b.createModule(.{
-        .root_source_file = .{ .cwd_relative = "src/engine/engine.zig" },
-        .imports = &[_]Import{
-            .{ .name = "core", .module = core },
-            .{ .name = "math", .module = math },
-            .{ .name = "utils", .module = utils },
-            .{ .name = "prof", .module = prof },
-        },
-    });
-    engine.addIncludePath(.{ .cwd_relative = "deps/wfc" });
-    engine.addCSourceFile(.{ .file = .{ .cwd_relative = "deps/wfc/wfc.c" }, .flags = &[_][]const u8{"-DWFC_USE_STB"} });
-
-    const gui = b.createModule(.{
-        .target = target,
-        .root_source_file = .{ .cwd_relative = "src/gui/gui.zig" },
-        .imports = &[_]Import{
-            .{ .name = "core", .module = core },
-            .{ .name = "math", .module = math },
-            .{ .name = "drawing", .module = drawing },
-            .{ .name = "utils", .module = utils },
-            .{ .name = "engine", .module = engine },
-            .{ .name = "prof", .module = prof },
-            .{ .name = "sdl", .module = sdl_module },
-        },
-    });
-
-    gui.linkLibrary(sdl_dep.artifact("SDL3"));
-    gui.linkLibrary(sdl_dep.artifact("SDL3_ttf"));
-    gui.addIncludePath(.{ .cwd_relative = "/opt/homebrew/include" });
-    // gui.linkSystemLibrary("SDL3_image", .{ .needed = true });
-
-    var module_list = std.ArrayList(ModulePair).init(b.allocator);
-
-    try module_list.append(ModulePair{ .name = "prof", .module = prof });
-    try module_list.append(ModulePair{ .name = "math", .module = math });
-    try module_list.append(ModulePair{ .name = "utils", .module = utils });
-    try module_list.append(ModulePair{ .name = "core", .module = core });
-    try module_list.append(ModulePair{ .name = "drawing", .module = drawing });
-    try module_list.append(ModulePair{ .name = "engine", .module = engine });
-    try module_list.append(ModulePair{ .name = "gui", .module = gui });
-
-    // Initialize global slice of modules with the allocated array list's items slice.
-    modules = module_list.items;
-}
-
-fn addModules(b: *Builder, step: *std.Build.Step.Compile) void {
-    const step_options = b.addOptions();
-    step_options.addOption(bool, "remotery", use_profiling);
-
-    for (modules) |module| {
-        step.root_module.addImport(module.name, module.module);
-    }
-}
-
-fn addCDeps(step: *std.Build.Step.Compile, sdl_dep: *std.Build.Dependency) void {
-    // Add SDL2 dependency
-    if (builtin.os.tag == .windows) {
-        step.addIncludePath(.{ .cwd_relative = "deps/tcl/include" });
-    }
-
-    step.linkLibrary(sdl_dep.artifact("SDL3"));
-    step.linkLibrary(sdl_dep.artifact("SDL3_ttf"));
-
-    //step.addIncludePath(.{ .cwd_relative = "deps/wfc" });
-    //step.addCSourceFile(.{ .file = .{ .cwd_relative = "deps/wfc/wfc.c" }, .flags = &[_][]const u8{"-DWFC_USE_STB"} });
-}
-
-fn addRemotery(step: *std.Build.Step.Compile) void {
-    if (use_profiling) {
-        step.addIncludePath(.{ .cwd_relative = "deps/remotery" });
-        step.addCSourceFile(.{ .file = .{"deps/remotery/Remotery.c"}, .flags = &[_][]const u8{
-            "-DRMT_ENABLED=1 -pthread",
-        } });
-    }
-}
-
 // Shared Library TCL Extension
 fn buildTclExtension(b: *Builder, target: std.Build.ResolvedTarget, mode: std.builtin.Mode, step_options: *std.Build.Step.Options) void {
     const lib = b.addSharedLibrary(
@@ -323,8 +334,6 @@ fn buildTclExtension(b: *Builder, target: std.Build.ResolvedTarget, mode: std.bu
     lib.linkLibC();
 
     lib.root_module.addOptions("build_options", step_options);
-
-    addRemotery(lib);
 
     addCDeps(lib);
     linkTcl(b, lib);

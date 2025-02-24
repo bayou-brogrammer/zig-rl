@@ -18,7 +18,7 @@ const rendering = g.rendering;
 
 const zt = @import("zigtcl");
 
-const sdl2 = g.sdl2;
+const sdl3 = g.sdl3;
 const logging = @import("src/logging.zig");
 
 const sdl = @import("sdl");
@@ -71,14 +71,14 @@ fn initGui(args: Args, allocator: Allocator) !Gui {
 }
 
 fn runGui(gui: *Gui) !void {
-    var ticks = sdl2.SDL_GetTicks();
+    var ticks = sdl3.SDL_GetTicks();
 
     zt.interp = zt.tcl.Tcl_CreateInterp();
 
     while (try gui.step(ticks)) {
         // NOTE this is pretty primitive. Consider a better frame limiter.
         std.time.sleep(1000000000 / gui.game.config.frame_rate);
-        ticks = sdl2.SDL_GetTicks();
+        ticks = sdl3.SDL_GetTicks();
     }
 }
 
