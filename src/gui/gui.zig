@@ -11,9 +11,6 @@ const DynamicBitSetUnmanaged = std.DynamicBitSetUnmanaged;
 const Allocator = std.mem.Allocator;
 const FixedBufferAllocator = std.heap.FixedBufferAllocator;
 
-const utils = @import("utils");
-const Timer = utils.timer.Timer;
-
 const math = @import("math");
 const Pos = math.pos.Pos;
 const Direction = math.direction.Direction;
@@ -32,20 +29,26 @@ const InputEvent = engine.input.InputEvent;
 const Settings = engine.settings.Settings;
 const GameState = engine.settings.GameState;
 const Msg = engine.messaging.Msg;
+const MapConfig = engine.procgen.MapConfig;
 
 const drawing = @import("drawing");
 const Panel = drawing.panel.Panel;
 const DrawCmd = drawing.drawcmd.DrawCmd;
+
+const utils = @import("utils");
+const Timer = utils.timer.Timer;
 
 const prof = @import("prof");
 
 pub const display = @import("display.zig");
 pub const Display = display.Display;
 pub const keyboard = @import("keyboard.zig");
-pub const sdl3 = @import("sdl3");
-pub const panels_import = @import("panels.zig");
 pub const imm = @import("imm.zig");
 pub const Imm = imm.Imm;
+pub const panels_import = @import("panels.zig");
+pub const rendering = @import("rendering.zig");
+pub const Painter = rendering.Painter;
+pub const sdl3 = @import("sdl3.zig");
 
 pub const Panels = panels_import.Panels;
 const Texture = sdl3.SDL_Texture;
@@ -64,13 +67,13 @@ pub const MsgStr = BoundedArrayAligned(u8, @alignOf(u8), 32);
 
 pub const GuiMode = enum {
     empty,
-
     startScreen,
-    helpMenu0,
-    helpMenu1,
-
+    pauseMenu,
     playing,
     exiting,
+
+    helpMenu0,
+    helpMenu1,
 
     pub fn isMenu(mode: GuiMode) bool {
         return mode != .playing and mode != .exiting;
@@ -185,13 +188,39 @@ pub const Gui = struct {
     }
 
     pub fn resolveMessage(gui: *Gui, msg: Msg) !void {
-        _ = msg; // autofix
         _ = gui; // autofix
-        // switch (msg) {
-        //     else => {},
-        // }
+        print("resolveMessage {}\n", .{msg});
+        switch (msg) {
+            // .spawn => |args| try gui.processSpawn(args.id, args.name),
+            // .move => |args| try gui.moveEntity(args.id, args.pos),
+            // // .startLevel => try gui.startLevel(),
+            // .cursorStart => |args| try gui.cursorStart(args),
+            // .cursorEnd => gui.cursorEnd(),
+            // .cursorMove => |args| gui.cursorMove(args),
+            // .hit => |args| try gui.processHit(args.id, args.start_pos, args.hit_pos, args.weapon_type, args.attack_style),
+            // .tookDamage => |args| try gui.processTookDamage(args),
+            // .heal => |args| try gui.processHeal(args.id, args.amount),
+            // .pickedUp => |args| try gui.processPickedUpItem(args.id, args.item_id, args.slot),
+            // .droppedItem => |args| try gui.processDroppedItem(args.id, args.slot),
+            // .itemLanded => |args| try gui.processItemLanded(args.id, args.start, args.hit),
+            // .sound => |args| try gui.processSound(args.id, args.pos, args.amount),
+            // .remove => |args| try gui.processRemove(args),
+            // .explosion => |args| try gui.processExplosion(args.id, args.pos, args.radius),
+            // .grassSpawned => |args| try gui.processGrassSpawned(args.pos, args.tall),
+            // .removeGrass => |args| try gui.processRemoveGrass(args),
+            // .vaultWall => |args| try gui.processVaultWall(args.id, args.from, args.to),
+            // .facing => |args| try gui.processFacing(args.id, args.facing),
+
+            else => {},
+        }
 
         // try gui.state.console_log.queue(&gui.game.level.entities, msg, gui.state.turn_count);
+    }
+
+    pub fn generateNewLevel(gui: *Gui, map_config: MapConfig) !void {
+        print("generateNewLevel\n", .{});
+        try gui.game.generateNewLevel(true, map_config);
+        try gui.game.resolveMessages();
     }
 
     ///////////////////////////////
@@ -230,11 +259,30 @@ pub const Gui = struct {
         const quit = quit_click == .up;
 
         if (new_game) {
+            print("new_game\n", .{});
             try gui.nextScreen();
         }
         if (quit) {
+            print("quit\n", .{});
             gui.mode = .exiting;
         }
+    }
+
+    pub fn stepPlaying(gui: *Gui, inputs: InputBuffer) !void {
+        for (inputs.slice()) |input_event| {
+            try gui.inputEvent(input_event);
+
+            if (gui.game.settings.state == .finishedLevel) {
+                try gui.nextScreen();
+            }
+        }
+
+        // if (gui.state.sidebar.visible) {
+        //     gui.state.sidebar.percent_shown += (@as(f32, @floatFromInt(gui.delta_ticks)) / 1000.0) * gui.game.config.sidebar_speed;
+        //     if (gui.state.sidebar.percent_shown > 1.0) {
+        //         gui.state.sidebar.percent_shown = 1.0;
+        //     }
+        // }
     }
 
     ///////////////////////////////
@@ -242,6 +290,7 @@ pub const Gui = struct {
     ///////////////////////////////
 
     pub fn nextScreen(gui: *Gui) !void {
+        print("nextScreen\n", .{});
         try gui.enterScreen();
 
         // Clear display state for new level to start.
@@ -250,19 +299,28 @@ pub const Gui = struct {
     }
 
     pub fn enterScreen(gui: *Gui) !void {
-        // switch (gui.state.screens.items[gui.state.next_screen_index]) {
-        //     .start => {
-        //         gui.enterStartScreen();
-        //     },
-        // }
+        print("enterScreen {}\n", .{gui.state.screens.items[gui.state.next_screen_index]});
 
-        gui.enterStartScreen();
+        switch (gui.state.screens.items[gui.state.next_screen_index]) {
+            .start => {
+                gui.enterStartScreen();
+            },
+
+            .level => |level_config| {
+                print("enterScreen level\n", .{});
+                gui.game.settings.exit_condition = level_config.win_condition;
+                try gui.generateNewLevel(level_config.map_config);
+                gui.game.changeState(.startNewLevel);
+                gui.mode = .playing;
+            },
+        }
 
         // When changing screens, clear UI state.
         gui.imm.clear();
     }
 
     fn enterStartScreen(gui: *Gui) void {
+        print("enterStartScreen\n", .{});
         // var dir = std.fs.cwd();
         // gui.found_save_file = true;
         // dir.access(SAVE_GAME_FILE_NAME, .{}) catch blk: {
@@ -270,24 +328,6 @@ pub const Gui = struct {
         //     break :blk;
         // };
         gui.mode = .startScreen;
-    }
-
-    fn collectImmInfo(gui: *Gui) !void {
-        const text_color = Color.init(0xcd, 0xb4, 0x96, 255);
-        var config = imm.Imm.Config.init(&gui.panels.screen.drawcmds, text_color);
-        config.justify = .left;
-
-        const start_pos = gui.panels.info_area.position();
-        gui.imm.pos = Pos.init(start_pos.x + 1, start_pos.y + 1);
-
-        const cursor_pos = gui.game.settings.mode.cursor.pos;
-
-        var y_pos: i32 = 1;
-
-        const coords_str = try std.fmt.allocPrint(gui.frame_allocator.allocator(), "({:>2},{:>2})", .{ @as(usize, @intCast(cursor_pos.x)), @as(usize, @intCast(cursor_pos.y)) });
-        try gui.imm.text(coords_str, config);
-
-        y_pos += 1;
     }
 
     ///////////////////////////////
@@ -309,6 +349,63 @@ pub const Gui = struct {
         return any_key_pressed;
     }
 
+    pub fn inputEvent(gui: *Gui, input_event: InputEvent) !void {
+        const is_char = input_event == .char;
+        const is_backwards_key = is_char and input_event.char.chr == '[';
+        _ = is_backwards_key; // autofix
+        const is_forward_key = is_char and input_event.char.chr == ']';
+        _ = is_forward_key; // autofix
+        const is_sidebar_key = is_char and input_event.char.chr == '`';
+        _ = is_sidebar_key; // autofix
+
+        const input_action = gui.game.handleInputEvent(input_event, gui.delta_ticks);
+
+        const key_dir_down = is_char and input_event.char.key_dir == .down;
+        const key_dir_up = is_char and input_event.char.key_dir == .up;
+
+        const question_mark = input_event == .char and input_event.char.chr == '/' and gui.game.input.shift and key_dir_up;
+
+        if (input_event == .quit) {
+            gui.mode = .exiting;
+            // } else if (gui.mode == .pauseMenu or gui.mode == .gameOverMenu) {
+        } else if (gui.mode == .pauseMenu) {
+            if (input_event == .char and input_event.char.chr == 'r') {
+                gui.state.next_screen_index = 0;
+                try gui.nextScreen();
+            } else if (input_event == .char and input_event.char.chr == 'q') {
+                gui.mode = .exiting;
+                // } else if (question_mark and gui.mode != .gameOverMenu) {
+            } else if (question_mark) {
+                gui.mode = .helpMenu1;
+            }
+        } else { // If currently in the first help menu, and the user pressed '?' or enter, move to the next help menu.
+            const enter_key_down = input_event == .enter and input_event.enter == .down;
+            const space_key_down = is_char and input_event.char.chr == ' ' and key_dir_down;
+
+            var handled_event = gui.mode.isMenu();
+            if (gui.mode == .helpMenu0 and (question_mark or enter_key_down or space_key_down)) {
+                gui.mode = .helpMenu1;
+                handled_event = true;
+            } else if (gui.mode == .helpMenu1 and (question_mark or enter_key_down or space_key_down)) {
+                gui.mode = .playing;
+                handled_event = true;
+            }
+
+            if (!handled_event and input_action != .none) {
+                try gui.game.step(input_action);
+
+                // if (gui.game.settings.state == .lose) {
+                //     gui.mode = .gameOverMenu;
+                // }
+
+                // Process all generated messages for display changes.
+                for (gui.game.log.all.items) |msg| {
+                    try gui.resolveMessage(msg);
+                }
+            }
+        }
+    }
+
     pub fn processInputs(gui: *Gui, inputs: InputBuffer) !bool {
         prof.Prof.scope("step");
         defer prof.Prof.end();
@@ -327,16 +424,20 @@ pub const Gui = struct {
 
         gui.game.input.tick();
         if (gui.mode == .empty) {
-            // if (gui.state.screens.items.len == 0) {
-            //     try gui.state.screens.append(gui.allocator, Screen.fromMapConfig(MapConfig.empty()));
-            // }
+            if (gui.state.screens.items.len == 0) {
+                try gui.state.screens.append(gui.allocator, Screen.start);
+                try gui.state.screens.append(gui.allocator, Screen.fromMapConfig(MapConfig.empty()));
+            }
 
             gui.state.next_screen_index = 0;
             try gui.enterScreen();
-            // gui.state.next_screen_index = (gui.state.next_screen_index + 1) % gui.state.screens.items.len;
+            gui.state.next_screen_index = (gui.state.next_screen_index + 1) % gui.state.screens.items.len;
         } else if (gui.mode == .startScreen) {
             try gui.stepStartScreen(inputs);
+        } else {
+            try gui.stepPlaying(inputs);
         }
+
         prof.Prof.end();
 
         if (gui.mode != .exiting) {
@@ -348,6 +449,24 @@ pub const Gui = struct {
 
         const exiting = gui.mode != .exiting;
         return exiting;
+    }
+
+    fn collectImmInfo(gui: *Gui) !void {
+        const text_color = Color.init(0xcd, 0xb4, 0x96, 255);
+        var config = imm.Imm.Config.init(&gui.panels.screen.drawcmds, text_color);
+        config.justify = .left;
+
+        const start_pos = gui.panels.info_area.position();
+        gui.imm.pos = Pos.init(start_pos.x + 1, start_pos.y + 1);
+
+        const cursor_pos = gui.game.settings.mode.cursor.pos;
+
+        var y_pos: i32 = 1;
+
+        const coords_str = try std.fmt.allocPrint(gui.frame_allocator.allocator(), "({:>2},{:>2})", .{ @as(usize, @intCast(cursor_pos.x)), @as(usize, @intCast(cursor_pos.y)) });
+        try gui.imm.text(coords_str, config);
+
+        y_pos += 1;
     }
 
     fn collectInputs(gui: *Gui, input_buffer: *InputBuffer) !void {
@@ -429,17 +548,22 @@ pub const Gui = struct {
     // Drawing
     ///////////////////////////////
 
+    fn makePainter(gui: *Gui) Painter {
+        return Painter{
+            .drawcmds = &gui.panels.level.drawcmds,
+            .area = gui.panels.level.panel.getRect(),
+        };
+    }
+
     pub fn draw(gui: *Gui) !void {
         gui.display.clear(&gui.panels.screen, Color.init(27, 27, 25, 255));
 
-        // if (gui.mode == .startScreen) {
-        //     // try gui.drawStartScreen();
-        //     try gui.drawHelpMenu();
-        // } else {
-        //     gui.display.draw(&gui.panels.screen);
-        // }
-
-        try gui.drawStartScreen();
+        if (gui.mode == .startScreen) {
+            try gui.drawStartScreen();
+        } else if (gui.mode != .empty) {
+            try gui.drawLevel();
+            try gui.drawOverlay();
+        }
 
         gui.display.present(&gui.panels.screen);
     }
@@ -448,6 +572,11 @@ pub const Gui = struct {
         try gui.collectImmInputsPlayer(input_buffer);
         // try gui.collectImmInputsInfo();
         // try gui.drawPips();
+    }
+
+    pub fn drawOverlay(gui: *Gui) !void {
+        _ = gui; // autofix
+        // gui.display.draw(&gui.panels.screen);
     }
 
     pub fn drawStartScreen(gui: *Gui) !void {
@@ -479,6 +608,19 @@ pub const Gui = struct {
         // );
 
         gui.display.draw(&gui.panels.screen);
+    }
+
+    pub fn drawLevel(gui: *Gui) !void {
+        var painter = gui.makePainter();
+
+        try rendering.renderLevel(&gui.game, &painter);
+        gui.display.clear(&gui.panels.level, Color.init(27, 27, 25, 255));
+        gui.display.draw(&gui.panels.level);
+
+        const map_area = mapWindowArea(gui.game.level.map.dims(), gui.state.map_window_center, gui.game.config.map_window_x, gui.game.config.map_window_y);
+
+        gui.display.clear(&gui.panels.screen, Color.init(27, 27, 25, 255));
+        gui.display.fitTexture(&gui.panels.screen, gui.panels.level_area, &gui.panels.level, map_area);
     }
 
     fn drawPlacard(gui: *Gui, text: []const u8, rect: Rect) !void {
@@ -549,17 +691,33 @@ fn configMTimeMs() !i64 {
     return config_mtime_ms;
 }
 
+pub const LevelConfig = struct {
+    map_config: MapConfig,
+    win_condition: engine.settings.LevelExitCondition = .none,
+
+    pub fn init(map_config: MapConfig) LevelConfig {
+        return LevelConfig{ .map_config = map_config };
+    }
+};
+
 pub const Screen = union(enum) {
     start,
     // classSelect,
     // skillSelect,
-    // level: LevelConfig,
+    level: LevelConfig,
     // win,
 
-    // pub fn fromMapConfig(map_config: MapConfig) Screen {
-    //     return Screen{ .level = LevelConfig.init(map_config) };
-    // }
+    pub fn fromMapConfig(map_config: MapConfig) Screen {
+        return Screen{ .level = LevelConfig.init(map_config) };
+    }
 };
+
+fn mapWindowArea(dims: Dims, center: Pos, dist_x: i32, dist_y: i32) Rect {
+    const up_left_edge = dims.clamp(Pos.init(center.x - dist_x, center.y - dist_y));
+    const width = @min(2 * @as(i32, @intCast(dist_x)) + 1, dims.width);
+    const height = @min(2 * @as(i32, @intCast(dist_y)) + 1, dims.height);
+    return Rect.initAt(@as(i32, @intCast(up_left_edge.x)), @as(i32, @intCast(up_left_edge.y)), width, height);
+}
 
 comptime {
     if (@import("builtin").is_test) {

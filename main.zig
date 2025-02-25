@@ -21,8 +21,6 @@ const zt = @import("zigtcl");
 const sdl3 = g.sdl3;
 const logging = @import("src/logging.zig");
 
-const sdl = @import("sdl");
-
 pub const std_options: std.Options = .{
     .logFn = logging.logFn,
     .log_level = .info,

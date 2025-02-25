@@ -1,5 +1,5 @@
 const std = @import("std");
-const sdl3 = @import("sdl3");
+const sdl3 = @import("sdl3.zig");
 
 const math = @import("math");
 const Pos = math.pos.Pos;

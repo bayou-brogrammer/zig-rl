@@ -12,6 +12,32 @@ pub const Msg = union(enum) {
     cursorStart: Pos,
     cursorMove: Pos,
     cursorEnd,
+
+    newLevel: void,
+    startLevel: void,
+
+    pub fn genericMsg(comptime msg_type: MsgType, args: anytype) Msg {
+        const fields = std.meta.fields(Msg);
+
+        const field_type = fields[@intFromEnum(msg_type)].type;
+        const field_type_info = @typeInfo(field_type);
+
+        var value: field_type = undefined;
+
+        const arg_type_info = @typeInfo(@TypeOf(args));
+        // NOTE(zig) std.meta.trait.isTuple returns false here for some reason.
+        if (arg_type_info == .Struct and arg_type_info.Struct.is_tuple) {
+            comptime var index = 0;
+            inline while (index < args.len) {
+                @field(value, field_type_info.Struct.fields[index].name) = args[index];
+                index += 1;
+            }
+        } else {
+            value = args;
+        }
+
+        return @unionInit(Msg, @tagName(msg_type), value);
+    }
 };
 
 pub const MsgLog = struct {
@@ -35,6 +61,12 @@ pub const MsgLog = struct {
         msg_log.all.deinit(msg_log.allocator);
     }
 
+    pub fn clear(msg_log: *MsgLog) void {
+        msg_log.remaining.clearRetainingCapacity();
+        msg_log.instant.clearRetainingCapacity();
+        msg_log.all.clearRetainingCapacity();
+    }
+
     pub fn pop(msg_log: *MsgLog) !?Msg {
         // First attempt to get a message from the 'instant' log to empty it first.
         // Then attempt to get from the main log, remaining.
@@ -55,5 +87,9 @@ pub const MsgLog = struct {
             try msg_log.all.append(msg_log.allocator, valid_msg);
         }
         return msg;
+    }
+
+    pub fn log(msg_log: *MsgLog, comptime msg_type: MsgType, args: anytype) !void {
+        try msg_log.remaining.append(msg_log.allocator, Msg.genericMsg(msg_type, args));
     }
 };

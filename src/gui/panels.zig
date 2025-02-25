@@ -28,17 +28,36 @@ pub const SCREEN_CELLS_HEIGHT: i32 = MAP_AREA_CELLS_HEIGHT + UI_CELLS_PIPS + UI_
 pub const Panels = struct {
     screen: TexturePanel,
 
+    level: TexturePanel,
+    level_area: Rect,
+
     pub fn init(width: i32, height: i32, disp: *Display, allocator: Allocator) !Panels {
         // Set up screen and its area.
         const screen_num_pixels = Dims.init(width, height);
         const screen_dims = Dims.init(SCREEN_CELLS_WIDTH, SCREEN_CELLS_HEIGHT);
         const screen_panel = Panel.init(screen_num_pixels, screen_dims);
 
+        // Lay out panels within the screen.
+        const screen_area = Rect.init(screen_dims.width, screen_dims.height);
+        const top_bottom_split = screen_area.splitBottom(@as(i32, @intCast(UI_CELLS_BOTTOM)));
+
+        const pip_map_area = top_bottom_split.first.splitBottom(@as(i32, @intCast(UI_CELLS_PIPS)));
+        const map_area = pip_map_area.first;
+
         // Create all texture panels and misc panels.
         const screen_texture_panel = try disp.texturePanel(screen_panel, allocator);
 
+        // Create the map panel.
+        const level_num_pixels = Dims.init(MAX_MAP_WIDTH * 16, MAX_MAP_HEIGHT * 16);
+        // const level_num_pixels = Dims.init(MAX_MAP_WIDTH * sprite.FONT_WIDTH, MAX_MAP_HEIGHT * sprite.FONT_HEIGHT);
+        const level_panel = Panel.init(level_num_pixels, Dims.init(MAX_MAP_WIDTH, MAX_MAP_HEIGHT));
+        const level_texture_panel = try disp.texturePanel(level_panel, allocator);
+
         return Panels{
             .screen = screen_texture_panel,
+
+            .level = level_texture_panel,
+            .level_area = map_area,
         };
     }
 

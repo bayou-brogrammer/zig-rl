@@ -2,8 +2,9 @@ const std = @import("std");
 const ArrayList = std.ArrayList;
 const AutoHashMap = std.AutoHashMap;
 const assert = std.debug.assert;
+const print = std.debug.print;
 
-const sdl3 = @import("sdl3");
+const sdl3 = @import("sdl3.zig");
 const Texture = sdl3.SDL_Texture;
 const Renderer = sdl3.SDL_Renderer;
 const Font = sdl3.TTF_Font;

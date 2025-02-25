@@ -13,15 +13,22 @@ const actions = @import("actions.zig");
 
 pub const GameState = enum {
     playing,
-    win,
-    lose,
     use,
-    finishedLevel,
     startNewLevel,
+    finishedLevel,
+
+    // win,
+    // lose,
 };
 
 pub const Mode = union(enum) {
     playing,
+};
+
+pub const LevelExitCondition = enum {
+    rightEdge,
+    keyAndGoal,
+    none,
 };
 
 pub const Settings = struct {
@@ -32,6 +39,7 @@ pub const Settings = struct {
     debug_enabled: bool = false,
     overlay_enabled: bool = false,
     map_changed: bool = false,
+    exit_condition: LevelExitCondition = LevelExitCondition.rightEdge,
 
     pub fn init() Settings {
         return Settings{};

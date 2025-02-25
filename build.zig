@@ -21,9 +21,10 @@ pub fn build(b: *Builder) !void {
     const mode = b.standardOptimizeOption(.{});
     const step_options = b.addOptions();
 
-    const sdl_module = setupSDL(b);
+    const sdl_dep = b.dependency("sdl", .{});
+    const sdl_module = setupSDL(b, sdl_dep);
 
-    try initModules(b, target, sdl_module);
+    try initModules(b, target, sdl_dep, sdl_module);
 
     if (builtin.os.tag == .windows) {
         // Move dlls to bin directory so Windows can find them.
@@ -32,15 +33,14 @@ pub fn build(b: *Builder) !void {
         b.installFile("lib/SDL2_image.dll", "bin/SDL2_image.dll");
     }
 
-    buildMain(b, target, mode, step_options);
+    buildMain(b, target, mode, step_options, sdl_dep);
     // buildTests(b, target, mode, step_options);
 
     // buildTclExtension(b, target, mode, step_options);
     // try runAtlas(b, target, mode);
 }
 
-fn setupSDL(b: *Builder) *std.Build.Module {
-    const sdl_dep = b.dependency("sdl", .{});
+fn setupSDL(b: *Builder, sdl_dep: *std.Build.Dependency) *std.Build.Module {
     const sdl_module = b.addModule("sdl", .{
         .root_source_file = b.addWriteFiles().add("src/lib.zig",
             \\pub usingnamespace @cImport({
@@ -59,7 +59,7 @@ fn setupSDL(b: *Builder) *std.Build.Module {
 }
 
 // Main Executable
-fn buildMain(b: *Builder, target: std.Build.ResolvedTarget, mode: std.builtin.Mode, step_options: *std.Build.Step.Options) void {
+fn buildMain(b: *Builder, target: std.Build.ResolvedTarget, mode: std.builtin.Mode, step_options: *std.Build.Step.Options, sdl_dep: *std.Build.Dependency) void {
     const exe = b.addExecutable(.{
         .name = "rustrl",
         .root_source_file = .{ .cwd_relative = "main.zig" },
@@ -78,7 +78,7 @@ fn buildMain(b: *Builder, target: std.Build.ResolvedTarget, mode: std.builtin.Mo
     exe.root_module.addOptions("build_options", step_options);
 
     exe.linkLibC();
-    addCDeps(exe);
+    addCDeps(exe, sdl_dep);
     // linkTcl(b, exe);
 
     exe.root_module.addImport("zigtcl", tcl_extension.module);
@@ -125,7 +125,7 @@ fn buildModuleTest(b: *Builder, name: []const u8, path: []const u8, target: std.
     exe_tests.root_module.addOptions("build_options", step_options);
 
     addCDeps(exe_tests);
-    linkTcl(b, exe_tests);
+    // linkTcl(b, exe_tests);
 
     exe_tests.addIncludePath(.{ .cwd_relative = "deps/tcl/include" });
     exe_tests.addIncludePath(.{ .cwd_relative = "deps/SDL2/include" });
@@ -147,21 +147,21 @@ fn buildModuleTest(b: *Builder, name: []const u8, path: []const u8, target: std.
     return test_step;
 }
 
-fn addCDeps(step: *std.Build.Step.Compile) void {
+fn addCDeps(step: *std.Build.Step.Compile, sdl_dep: *std.Build.Dependency) void {
     // Add SDL2 dependency
     if (builtin.os.tag == .windows) {
         step.addIncludePath(.{ .cwd_relative = "deps/tcl/include" });
     }
 
-    // step.addIncludePath(.{ .cwd_relative = "/opt/homebrew/include" });
-    // step.linkLibrary(sdl_dep.artifact("SDL3"));
-    // step.linkLibrary(sdl_dep.artifact("SDL3_ttf"));
+    step.addIncludePath(.{ .cwd_relative = "/opt/homebrew/include" });
+    step.linkLibrary(sdl_dep.artifact("SDL3"));
+    step.linkLibrary(sdl_dep.artifact("SDL3_ttf"));
 
     //step.addIncludePath(.{ .cwd_relative = "deps/wfc" });
     //step.addCSourceFile(.{ .file = .{ .cwd_relative = "deps/wfc/wfc.c" }, .flags = &[_][]const u8{"-DWFC_USE_STB"} });
 }
 
-fn initModules(b: *Builder, target: std.Build.ResolvedTarget, sdl_module: *std.Build.Module) !void {
+fn initModules(b: *Builder, target: std.Build.ResolvedTarget, sdl_dep: *std.Build.Dependency, sdl_module: *std.Build.Module) !void {
     const zigtcl = b.createModule(.{ .root_source_file = .{ .cwd_relative = "deps/zig_tcl/zigtcl.zig" }, .imports = &.{} });
     zigtcl.addIncludePath(.{ .cwd_relative = "deps/tcl/include" });
     tcl_extension = ModulePair{ .name = "zigtcl", .module = zigtcl };
@@ -245,9 +245,9 @@ fn initModules(b: *Builder, target: std.Build.ResolvedTarget, sdl_module: *std.B
         },
     });
 
-    // gui.addIncludePath(.{ .cwd_relative = "/opt/homebrew/include" });
-    // gui.linkLibrary(sdl_dep.artifact("SDL3"));
-    // gui.linkLibrary(sdl_dep.artifact("SDL3_ttf"));
+    gui.addIncludePath(.{ .cwd_relative = "/opt/homebrew/include" });
+    gui.linkLibrary(sdl_dep.artifact("SDL3"));
+    gui.linkLibrary(sdl_dep.artifact("SDL3_ttf"));
 
     var module_list = std.ArrayList(ModulePair).init(b.allocator);
 
@@ -274,88 +274,88 @@ fn addModules(b: *Builder, step: *std.Build.Step.Compile) void {
     }
 }
 
-// Run Atlas Process
-fn runAtlas(b: *Builder, target: std.Build.ResolvedTarget, mode: std.builtin.Mode) !void {
-    const exe = b.addExecutable(.{ .name = "atlas", .target = target, .optimize = mode });
-    exe.linkLibC();
+// // Run Atlas Process
+// fn runAtlas(b: *Builder, target: std.Build.ResolvedTarget, mode: std.builtin.Mode) !void {
+//     const exe = b.addExecutable(.{ .name = "atlas", .target = target, .optimize = mode });
+//     exe.linkLibC();
 
-    // C source
-    exe.addCSourceFile(.{ .file = .{ .cwd_relative = "deps/atlas/main.c" }, .flags = &[_][]const u8{} });
-    exe.addCSourceFile(.{ .file = .{ .cwd_relative = "deps/atlas/bitmap.c" }, .flags = &[_][]const u8{} });
-    exe.addCSourceFile(.{ .file = .{ .cwd_relative = "deps/atlas/util.c" }, .flags = &[_][]const u8{} });
-    exe.addCSourceFile(.{ .file = .{ .cwd_relative = "deps/atlas/lib/stb/stb_image.c" }, .flags = &[_][]const u8{} });
-    exe.addCSourceFile(.{ .file = .{ .cwd_relative = "deps/atlas/lib/stb/stb_image_write.c" }, .flags = &[_][]const u8{} });
-    exe.addCSourceFile(.{ .file = .{ .cwd_relative = "deps/atlas/lib/stb/stb_rect_pack.c" }, .flags = &[_][]const u8{} });
-    exe.addCSourceFile(.{ .file = .{ .cwd_relative = "deps/atlas/lib/stb/stb_truetype.c" }, .flags = &[_][]const u8{} });
+//     // C source
+//     exe.addCSourceFile(.{ .file = .{ .cwd_relative = "deps/atlas/main.c" }, .flags = &[_][]const u8{} });
+//     exe.addCSourceFile(.{ .file = .{ .cwd_relative = "deps/atlas/bitmap.c" }, .flags = &[_][]const u8{} });
+//     exe.addCSourceFile(.{ .file = .{ .cwd_relative = "deps/atlas/util.c" }, .flags = &[_][]const u8{} });
+//     exe.addCSourceFile(.{ .file = .{ .cwd_relative = "deps/atlas/lib/stb/stb_image.c" }, .flags = &[_][]const u8{} });
+//     exe.addCSourceFile(.{ .file = .{ .cwd_relative = "deps/atlas/lib/stb/stb_image_write.c" }, .flags = &[_][]const u8{} });
+//     exe.addCSourceFile(.{ .file = .{ .cwd_relative = "deps/atlas/lib/stb/stb_rect_pack.c" }, .flags = &[_][]const u8{} });
+//     exe.addCSourceFile(.{ .file = .{ .cwd_relative = "deps/atlas/lib/stb/stb_truetype.c" }, .flags = &[_][]const u8{} });
 
-    // C include paths
-    exe.addIncludePath(.{ .cwd_relative = "deps/atlas" });
-    exe.addIncludePath(.{ .cwd_relative = "deps/atlas/lib/stb" });
+//     // C include paths
+//     exe.addIncludePath(.{ .cwd_relative = "deps/atlas" });
+//     exe.addIncludePath(.{ .cwd_relative = "deps/atlas/lib/stb" });
 
-    b.installArtifact(exe);
+//     b.installArtifact(exe);
 
-    const run_cmd = b.addRunArtifact(exe);
-    run_cmd.step.dependOn(b.getInstallStep());
+//     const run_cmd = b.addRunArtifact(exe);
+//     run_cmd.step.dependOn(b.getInstallStep());
 
-    var dir = try std.fs.cwd().openDir("data/sprites/animations/", .{ .iterate = true });
-    defer dir.close();
-    var walker = dir.iterate();
-    while (try walker.next()) |entry| {
-        if (entry.kind == .directory) {
-            const path = try std.mem.join(b.allocator, "/", &[_][]const u8{ "data/sprites/animations", entry.name });
-            defer b.allocator.free(path);
-            run_cmd.addArg(path);
-        }
-    }
-    run_cmd.addArg("data/sprites/misc/"[0..]);
-    run_cmd.addArg("data/sprites/UI/"[0..]);
-    run_cmd.addArg("data/sprites/tileset/"[0..]);
+//     var dir = try std.fs.cwd().openDir("data/sprites/animations/", .{ .iterate = true });
+//     defer dir.close();
+//     var walker = dir.iterate();
+//     while (try walker.next()) |entry| {
+//         if (entry.kind == .directory) {
+//             const path = try std.mem.join(b.allocator, "/", &[_][]const u8{ "data/sprites/animations", entry.name });
+//             defer b.allocator.free(path);
+//             run_cmd.addArg(path);
+//         }
+//     }
+//     run_cmd.addArg("data/sprites/misc/"[0..]);
+//     run_cmd.addArg("data/sprites/UI/"[0..]);
+//     run_cmd.addArg("data/sprites/tileset/"[0..]);
 
-    run_cmd.addArg("--imageout"[0..]);
-    run_cmd.addArg("data/spriteAtlas.png"[0..]);
-    run_cmd.addArg("--textout"[0..]);
-    run_cmd.addArg("data/spriteAtlas.txt"[0..]);
+//     run_cmd.addArg("--imageout"[0..]);
+//     run_cmd.addArg("data/spriteAtlas.png"[0..]);
+//     run_cmd.addArg("--textout"[0..]);
+//     run_cmd.addArg("data/spriteAtlas.txt"[0..]);
 
-    const tileset_cmd = b.addSystemCommand(&[_][]const u8{"tclsh"});
-    tileset_cmd.addArg("scripts/add_tiles_to_atlas.tcl"[0..]);
-    tileset_cmd.addArg("data/spriteAtlas.txt"[0..]);
-    tileset_cmd.addArg("data/tile_locations.txt"[0..]);
-    tileset_cmd.step.dependOn(&run_cmd.step);
+//     const tileset_cmd = b.addSystemCommand(&[_][]const u8{"tclsh"});
+//     tileset_cmd.addArg("scripts/add_tiles_to_atlas.tcl"[0..]);
+//     tileset_cmd.addArg("data/spriteAtlas.txt"[0..]);
+//     tileset_cmd.addArg("data/tile_locations.txt"[0..]);
+//     tileset_cmd.step.dependOn(&run_cmd.step);
 
-    const run_step = b.step("atlas", "Run the atlas creation process");
-    run_step.dependOn(&tileset_cmd.step);
-}
+//     const run_step = b.step("atlas", "Run the atlas creation process");
+//     run_step.dependOn(&tileset_cmd.step);
+// }
 
-// Shared Library TCL Extension
-fn buildTclExtension(b: *Builder, target: std.Build.ResolvedTarget, mode: std.builtin.Mode, step_options: *std.Build.Step.Options) void {
-    const lib = b.addSharedLibrary(
-        .{ .name = "rrl", .root_source_file = .{ .cwd_relative = "tclrrl.zig" }, .target = target, .optimize = mode },
-    );
-    lib.linkLibC();
+// // Shared Library TCL Extension
+// fn buildTclExtension(b: *Builder, target: std.Build.ResolvedTarget, mode: std.builtin.Mode, step_options: *std.Build.Step.Options) void {
+//     const lib = b.addSharedLibrary(
+//         .{ .name = "rrl", .root_source_file = .{ .cwd_relative = "tclrrl.zig" }, .target = target, .optimize = mode },
+//     );
+//     lib.linkLibC();
 
-    lib.root_module.addOptions("build_options", step_options);
+//     lib.root_module.addOptions("build_options", step_options);
 
-    addCDeps(lib);
-    linkTcl(b, lib);
+//     addCDeps(lib);
+//     linkTcl(b, lib);
 
-    lib.root_module.addImport("zigtcl", tcl_extension.module);
-    addModules(b, lib);
+//     lib.root_module.addImport("zigtcl", tcl_extension.module);
+//     addModules(b, lib);
 
-    b.installArtifact(lib);
+//     b.installArtifact(lib);
 
-    const lib_step = b.step("tcl", "Build TCL extension");
-    lib_step.dependOn(&lib.step);
-}
+//     const lib_step = b.step("tcl", "Build TCL extension");
+//     lib_step.dependOn(&lib.step);
+// }
 
-fn linkTcl(b: *Builder, step: *std.Build.Step.Compile) void {
-    if (builtin.os.tag == .windows) {
-        step.addLibraryPath(.{ .cwd_relative = "lib" });
-        step.addIncludePath(.{ .cwd_relative = "deps/tcl/include" });
-        step.linkSystemLibrary("tcl86");
-        b.installFile("lib/tcl86.dll", "bin/tcl86.dll");
-    } else {
-        step.addIncludePath(.{ .cwd_relative = "deps/tcl/include" });
-        step.linkSystemLibrary("tcl");
-        step.addObjectFile(.{ .cwd_relative = "deps/tcl/lib/libtclstub.a" });
-    }
-}
+// fn linkTcl(b: *Builder, step: *std.Build.Step.Compile) void {
+//     if (builtin.os.tag == .windows) {
+//         step.addLibraryPath(.{ .cwd_relative = "lib" });
+//         step.addIncludePath(.{ .cwd_relative = "deps/tcl/include" });
+//         step.linkSystemLibrary("tcl86");
+//         b.installFile("lib/tcl86.dll", "bin/tcl86.dll");
+//     } else {
+//         step.addIncludePath(.{ .cwd_relative = "deps/tcl/include" });
+//         step.linkSystemLibrary("tcl");
+//         step.addObjectFile(.{ .cwd_relative = "deps/tcl/lib/libtclstub.a" });
+//     }
+// }

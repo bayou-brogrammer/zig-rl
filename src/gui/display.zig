@@ -6,7 +6,7 @@ const mem = std.mem;
 const fs = std.fs;
 const Allocator = mem.Allocator;
 
-const sdl3 = @import("sdl3");
+const sdl3 = @import("sdl3.zig");
 const Texture = sdl3.SDL_Texture;
 const Renderer = sdl3.SDL_Renderer;
 const Font = sdl3.TTF_Font;
@@ -311,6 +311,6 @@ pub const TexturePanel = struct {
     }
 };
 
-fn sdl3Rect(rect: Rect) sdl3.SDL_Rect {
-    return sdl3.SDL_Rect{ .x = @as(c_int, @intCast(rect.x_offset)), .y = @as(c_int, @intCast(rect.y_offset)), .w = @as(c_int, @intCast(rect.width)), .h = @as(c_int, @intCast(rect.height)) };
+fn sdl3Rect(rect: Rect) sdl3.SDL_FRect {
+    return sdl3.SDL_FRect{ .x = @as(f32, @floatFromInt(rect.x_offset)), .y = @as(f32, @floatFromInt(rect.y_offset)), .w = @as(f32, @floatFromInt(rect.width)), .h = @as(f32, @floatFromInt(rect.height)) };
 }
