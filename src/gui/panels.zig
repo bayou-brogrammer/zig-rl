@@ -48,7 +48,7 @@ pub const Panels = struct {
         const screen_texture_panel = try disp.texturePanel(screen_panel, allocator);
 
         // Create the map panel.
-        const level_num_pixels = Dims.init(MAX_MAP_WIDTH * 16, MAX_MAP_HEIGHT * 16);
+        const level_num_pixels = Dims.init(MAX_MAP_WIDTH * 24, MAX_MAP_HEIGHT * 24);
         // const level_num_pixels = Dims.init(MAX_MAP_WIDTH * sprite.FONT_WIDTH, MAX_MAP_HEIGHT * sprite.FONT_HEIGHT);
         const level_panel = Panel.init(level_num_pixels, Dims.init(MAX_MAP_WIDTH, MAX_MAP_HEIGHT));
         const level_texture_panel = try disp.texturePanel(level_panel, allocator);

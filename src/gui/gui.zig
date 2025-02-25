@@ -11,15 +11,13 @@ const DynamicBitSetUnmanaged = std.DynamicBitSetUnmanaged;
 const Allocator = std.mem.Allocator;
 const FixedBufferAllocator = std.heap.FixedBufferAllocator;
 
-const math = @import("math");
-const Pos = math.pos.Pos;
-const Direction = math.direction.Direction;
-const Dims = math.dims.Dims;
-const Color = math.utils.Color;
-const Rect = math.rect.Rect;
-
 const core = @import("core");
 const Config = core.config.Config;
+const entities = core.entities;
+
+const drawing = @import("drawing");
+const Panel = drawing.panel.Panel;
+const DrawCmd = drawing.drawcmd.DrawCmd;
 
 const engine = @import("engine");
 const InputAction = engine.actions.InputAction;
@@ -31,12 +29,17 @@ const GameState = engine.settings.GameState;
 const Msg = engine.messaging.Msg;
 const MapConfig = engine.procgen.MapConfig;
 
-const drawing = @import("drawing");
-const Panel = drawing.panel.Panel;
-const DrawCmd = drawing.drawcmd.DrawCmd;
+const math = @import("math");
+const Pos = math.pos.Pos;
+const Direction = math.direction.Direction;
+const Dims = math.dims.Dims;
+const Color = math.utils.Color;
+const Rect = math.rect.Rect;
+const Tween = math.tween.Tween;
 
 const utils = @import("utils");
 const Timer = utils.timer.Timer;
+const Id = utils.comp.Id;
 
 const prof = @import("prof");
 
@@ -115,7 +118,7 @@ pub const Gui = struct {
     display: display.Display,
     game: Game,
     state: DisplayState,
-    profiler: prof.Prof,
+    // profiler: prof.Prof,
     delta_ticks: u64,
     ticks: u64,
     reload_config_timer: Timer,
@@ -132,11 +135,11 @@ pub const Gui = struct {
         var fixed_buffer_allocator = FixedBufferAllocator.init(frame_allocation);
 
         const game = try Game.init(seed, allocator, fixed_buffer_allocator.allocator());
-        var profiler: prof.Prof = prof.Prof{};
-        if (game.config.use_profiling) {
-            try profiler.start();
-            prof.Prof.log("Starting up");
-        }
+        // var profiler: prof.Prof = prof.Prof{};
+        // if (game.config.use_profiling) {
+        //     try profiler.start();
+        //     prof.Prof.log("Starting up");
+        // }
 
         var disp = try display.Display.init("rustrl", WINDOW_WIDTH, WINDOW_HEIGHT, allocator);
 
@@ -161,11 +164,13 @@ pub const Gui = struct {
             .imm = Imm.init(allocator, disp.charDims(&panels.screen.panel, 1.0)),
             .mode = .empty,
             .panels = panels,
-            .profiler = profiler,
+            // .profiler = profiler,
             .reload_config_timer = Timer.init(game.config.reload_config_period),
             .state = state,
             .ticks = 0,
         };
+
+        try gui.game.generateNewLevel(false, MapConfig.empty());
         try gui.game.resolveMessages();
 
         return gui;
@@ -176,7 +181,7 @@ pub const Gui = struct {
         gui.state.deinit(gui.allocator);
         gui.game.deinit();
         gui.panels.deinit();
-        gui.profiler.deinit();
+        // gui.profiler.deinit();
         gui.allocator.free(gui.frame_allocator.buffer);
         gui.imm.deinit();
     }
@@ -188,15 +193,16 @@ pub const Gui = struct {
     }
 
     pub fn resolveMessage(gui: *Gui, msg: Msg) !void {
-        _ = gui; // autofix
-        print("resolveMessage {}\n", .{msg});
+        print("GUI: resolveMessage {}\n", .{msg});
         switch (msg) {
+            .startLevel => try gui.startLevel(),
             // .spawn => |args| try gui.processSpawn(args.id, args.name),
-            // .move => |args| try gui.moveEntity(args.id, args.pos),
-            // // .startLevel => try gui.startLevel(),
+            .move => |args| try gui.moveEntity(args.id, args.pos),
+
             // .cursorStart => |args| try gui.cursorStart(args),
             // .cursorEnd => gui.cursorEnd(),
             // .cursorMove => |args| gui.cursorMove(args),
+
             // .hit => |args| try gui.processHit(args.id, args.start_pos, args.hit_pos, args.weapon_type, args.attack_style),
             // .tookDamage => |args| try gui.processTookDamage(args),
             // .heal => |args| try gui.processHeal(args.id, args.amount),
@@ -217,8 +223,41 @@ pub const Gui = struct {
         // try gui.state.console_log.queue(&gui.game.level.entities, msg, gui.state.turn_count);
     }
 
+    fn startLevel(gui: *Gui) !void {
+        gui.state.map_window_center = gui.game.level.entities.pos.get(entities.Entities.player_id);
+        // gui.state.console_log.clear();
+        // gui.state.effects.clearRetainingCapacity();
+        // gui.state.low_effects.clearRetainingCapacity();
+        // gui.state.particles.clearRetainingCapacity();
+        gui.state.impressions.unsetAll();
+        // gui.state.animation.clear();
+
+        var dims_iter = gui.game.level.map.dims().iter();
+        while (dims_iter.next()) |pos| {
+            const tile = gui.game.level.map.get(pos);
+            _ = tile; // autofix
+            // We need to add back in the tall grass animations since we just removed everything from level generation
+            // when the level started.
+            // if (tile.center.material == .grass) {
+            //     try gui.processGrassSpawned(pos, tile.center.height == .tall);
+            // }
+        }
+    }
+
+    fn moveEntity(gui: *Gui, id: Id, pos: Pos) !void {
+        // When moving the player, update the map window with the currently configured parameters.
+        if (id == entities.Entities.player_id) {
+            gui.state.map_window_center = try mapWindowUpdate(
+                gui.state.map_window_center,
+                pos,
+                gui.game.config.map_window_edge,
+                @max(gui.game.config.map_window_x, gui.game.config.map_window_y),
+                gui.game.level.map.dims(),
+            );
+        }
+    }
+
     pub fn generateNewLevel(gui: *Gui, map_config: MapConfig) !void {
-        print("generateNewLevel\n", .{});
         try gui.game.generateNewLevel(true, map_config);
         try gui.game.resolveMessages();
     }
@@ -259,11 +298,10 @@ pub const Gui = struct {
         const quit = quit_click == .up;
 
         if (new_game) {
-            print("new_game\n", .{});
+            print("\n\n", .{});
             try gui.nextScreen();
         }
         if (quit) {
-            print("quit\n", .{});
             gui.mode = .exiting;
         }
     }
@@ -290,7 +328,6 @@ pub const Gui = struct {
     ///////////////////////////////
 
     pub fn nextScreen(gui: *Gui) !void {
-        print("nextScreen\n", .{});
         try gui.enterScreen();
 
         // Clear display state for new level to start.
@@ -299,15 +336,12 @@ pub const Gui = struct {
     }
 
     pub fn enterScreen(gui: *Gui) !void {
-        print("enterScreen {}\n", .{gui.state.screens.items[gui.state.next_screen_index]});
-
         switch (gui.state.screens.items[gui.state.next_screen_index]) {
             .start => {
                 gui.enterStartScreen();
             },
 
             .level => |level_config| {
-                print("enterScreen level\n", .{});
                 gui.game.settings.exit_condition = level_config.win_condition;
                 try gui.generateNewLevel(level_config.map_config);
                 gui.game.changeState(.startNewLevel);
@@ -320,7 +354,6 @@ pub const Gui = struct {
     }
 
     fn enterStartScreen(gui: *Gui) void {
-        print("enterStartScreen\n", .{});
         // var dir = std.fs.cwd();
         // gui.found_save_file = true;
         // dir.access(SAVE_GAME_FILE_NAME, .{}) catch blk: {
@@ -352,17 +385,16 @@ pub const Gui = struct {
     pub fn inputEvent(gui: *Gui, input_event: InputEvent) !void {
         const is_char = input_event == .char;
         const is_backwards_key = is_char and input_event.char.chr == '[';
-        _ = is_backwards_key; // autofix
         const is_forward_key = is_char and input_event.char.chr == ']';
-        _ = is_forward_key; // autofix
         const is_sidebar_key = is_char and input_event.char.chr == '`';
+
         _ = is_sidebar_key; // autofix
+        _ = is_backwards_key; // autofix
+        _ = is_forward_key; // autofix
 
         const input_action = gui.game.handleInputEvent(input_event, gui.delta_ticks);
-
         const key_dir_down = is_char and input_event.char.key_dir == .down;
         const key_dir_up = is_char and input_event.char.key_dir == .up;
-
         const question_mark = input_event == .char and input_event.char.chr == '/' and gui.game.input.shift and key_dir_up;
 
         if (input_event == .quit) {
@@ -717,6 +749,43 @@ fn mapWindowArea(dims: Dims, center: Pos, dist_x: i32, dist_y: i32) Rect {
     const width = @min(2 * @as(i32, @intCast(dist_x)) + 1, dims.width);
     const height = @min(2 * @as(i32, @intCast(dist_y)) + 1, dims.height);
     return Rect.initAt(@as(i32, @intCast(up_left_edge.x)), @as(i32, @intCast(up_left_edge.y)), width, height);
+}
+
+/// A map window controls the part of the map around the player that is visible
+/// during a turn. This can follow the player, it can show a map that always gives
+/// a little buffer around the player, or it can just display the entire map (effectively
+/// disabling the map window concept).
+/// If edge_dist or dist are negative the following behavior is disabled. If dist is
+/// negative the whole map will be displayed.
+fn mapWindowUpdate(pos: Pos, new_pos: Pos, edge_dist: i32, dist: i32, map_dims: Dims) !Pos {
+    var center = pos;
+    if (dist < 0 or edge_dist < 0) {
+        center = new_pos;
+    } else {
+        // Move the map window in x and y.
+        // However, only move the map window if the position is not next to the edge of the map.
+        const needs_move_dist = dist - edge_dist;
+
+        const x_dist = new_pos.x - center.x;
+        const x_abs_dist: i32 = @intCast(@abs(x_dist));
+        if (x_abs_dist > needs_move_dist) {
+            const x_map_edge_dist = @min(new_pos.x, @as(i32, @intCast(map_dims.width)) - new_pos.x);
+            if (x_map_edge_dist >= edge_dist) {
+                center.x = center.x + ((x_abs_dist - needs_move_dist) * std.math.sign(x_dist));
+            }
+        }
+
+        const y_dist = new_pos.y - center.y;
+        const y_abs_dist: i32 = @intCast(@abs(y_dist));
+        if (y_abs_dist > needs_move_dist) {
+            const y_map_edge_dist = @min(new_pos.y, @as(i32, @intCast(map_dims.height)) - new_pos.y);
+            if (y_map_edge_dist >= edge_dist) {
+                center.y = center.y + ((y_abs_dist - needs_move_dist) * std.math.sign(y_dist));
+            }
+        }
+    }
+
+    return center;
 }
 
 comptime {

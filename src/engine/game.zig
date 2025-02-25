@@ -29,6 +29,7 @@ pub const Settings = s.Settings;
 
 const procgen = @import("procgen.zig");
 pub const resolve = @import("resolve.zig");
+const spawn = @import("spawn.zig");
 const utils = @import("utils");
 
 pub const CONFIG_PATH: []const u8 = "data/config.txt";
@@ -47,7 +48,7 @@ pub const Game = struct {
         _ = seed; // autofix
         // const rng = RndGen.init(seed);
         const config = try Config.fromFile(CONFIG_PATH[0..]);
-        const level = Level.empty();
+        const level = Level.empty(allocator);
         const log = try MsgLog.init(allocator);
 
         return Game{
@@ -97,22 +98,19 @@ pub const Game = struct {
     }
 
     pub fn startEmptyLevel(game: *Game, width: i32, height: i32, ids: ?utils.comp.Ids) !void {
-        _ = ids; // autofix
         game.level.map.deinit(game.allocator);
-
-        print("Generating map... {d}x{d}\n", .{ width, height });
         game.level.map = try Map.fromDims(width, height, game.allocator);
 
         game.log.deinit();
         game.log = try MsgLog.init(game.allocator);
         try game.log.log(.newLevel, .{});
 
-        // if (ids) |ids_to_keep| {
-        //     game.level.entities.clearExcept(game.allocator, ids_to_keep);
-        // } else {
-        //     game.level.entities.clear();
-        //     try spawn.spawnPlayer(&game.level.entities, &game.log, &game.config, game.allocator);
-        // }
+        if (ids) |ids_to_keep| {
+            game.level.entities.clearExcept(game.allocator, ids_to_keep);
+        } else {
+            game.level.entities.clear();
+            try spawn.spawnPlayer(&game.level.entities, &game.log, &game.config, game.allocator);
+        }
     }
 
     pub fn step(game: *Game, input_action: InputAction) !void {

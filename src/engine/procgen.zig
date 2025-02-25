@@ -8,6 +8,7 @@ const Random = std.Random;
 const BoundedArray = std.BoundedArray;
 
 const core = @import("core");
+const Entities = core.entities.Entities;
 const Level = core.level.Level;
 const ConfigStr = core.config.ConfigStr;
 
@@ -24,9 +25,9 @@ const utils = @import("utils");
 const Id = utils.comp.Id;
 
 pub const MapConfig = struct {
-    width: i32 = 20,
-    height: i32 = 20,
-    player: ?Pos = Pos.init(0, 0),
+    width: i32 = 40,
+    height: i32 = 40,
+    player: ?Pos = Pos.init(10, 10),
     map_type: union(enum) { empty: void, procgen: ConfigStr, vault: i32, layout: ConfigStr },
 
     pub fn empty() MapConfig {
@@ -41,18 +42,15 @@ pub const MapConfig = struct {
 };
 
 pub fn generateMap(game: *Game, keep_player: bool, map_config: MapConfig) !void {
-    _ = keep_player; // autofix
-    const ids: ?utils.comp.Ids = null;
-    // if (keep_player) {
-    //     ids = utils.comp.Ids.initEmpty();
-    //     ids.?.set(Entities.player_id);
-    //     const item_ids = game.level.entities.inventory.get(Entities.player_id).itemIds();
-    //     for (item_ids.constSlice()) |item_id| {
-    //         ids.?.set(item_id);
-    //     }
-    // }
-
-    print("generateMap {}\n", .{map_config.map_type});
+    var ids: ?utils.comp.Ids = null;
+    if (keep_player) {
+        ids = utils.comp.Ids.initEmpty();
+        ids.?.set(Entities.player_id);
+        // const item_ids = game.level.entities.inventory.get(Entities.player_id).itemIds();
+        // for (item_ids.constSlice()) |item_id| {
+        //     ids.?.set(item_id);
+        // }
+    }
 
     switch (map_config.map_type) {
         .procgen => {},
@@ -61,9 +59,9 @@ pub fn generateMap(game: *Game, keep_player: bool, map_config: MapConfig) !void 
         .empty => {
             try game.startEmptyLevel(map_config.width, map_config.height, ids);
 
-            // if (map_config.player) |player_pos| {
-            //     try game.log.log(.move, .{ Entities.player_id, .blink, .walk, player_pos });
-            // }
+            if (map_config.player) |player_pos| {
+                try game.log.log(.move, .{ Entities.player_id, .blink, .walk, player_pos });
+            }
         },
     }
 

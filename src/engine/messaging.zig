@@ -3,8 +3,17 @@ const ArrayList = std.ArrayList;
 const ArrayListUnmanaged = std.ArrayListUnmanaged;
 const Allocator = std.mem.Allocator;
 
+const core = @import("core");
+const MoveType = core.movement.MoveType;
+const MoveMode = core.movement.MoveMode;
+const Name = core.entities.Name;
+
 const math = @import("math");
 const Pos = math.pos.Pos;
+const Direction = math.direction.Direction;
+
+const utils = @import("utils");
+const Id = utils.comp.Id;
 
 pub const MsgType = std.meta.Tag(Msg);
 
@@ -15,6 +24,11 @@ pub const Msg = union(enum) {
 
     newLevel: void,
     startLevel: void,
+
+    tryMove: struct { id: Id, dir: Direction, amount: usize },
+    move: struct { id: Id, move_type: MoveType, move_mode: MoveMode, pos: Pos },
+    facing: struct { id: Id, facing: Direction },
+    spawn: struct { id: Id, name: Name },
 
     pub fn genericMsg(comptime msg_type: MsgType, args: anytype) Msg {
         const fields = std.meta.fields(Msg);
@@ -91,5 +105,9 @@ pub const MsgLog = struct {
 
     pub fn log(msg_log: *MsgLog, comptime msg_type: MsgType, args: anytype) !void {
         try msg_log.remaining.append(msg_log.allocator, Msg.genericMsg(msg_type, args));
+    }
+
+    pub fn now(msg_log: *MsgLog, comptime msg_type: MsgType, args: anytype) !void {
+        try msg_log.instant.append(msg_log.allocator, Msg.genericMsg(msg_type, args));
     }
 };
